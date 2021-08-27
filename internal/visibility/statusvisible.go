@@ -21,7 +21,6 @@ package visibility
 import (
 	"context"
 	"errors"
-
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -47,7 +46,6 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 		l.Debugf("error checking domain block: %s", err)
 		return false, fmt.Errorf("error checking domain block: %s", err)
 	}
-
 	if domainBlocked {
 		return false, nil
 	}
@@ -136,25 +134,13 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 		return false, nil
 	}
 
-	// status replies to account id
+	// If not in reply to the requesting account, check if inReplyToAccount is blocked
 	if relevantAccounts.InReplyToAccount != nil && relevantAccounts.InReplyToAccount.ID != requestingAccount.ID {
 		if blocked, err := f.db.IsBlocked(ctx, relevantAccounts.InReplyToAccount.ID, requestingAccount.ID, true); err != nil {
 			return false, err
 		} else if blocked {
 			l.Trace("a block exists between requesting account and reply to account")
 			return false, nil
-		}
-
-		// check reply to ID
-		if targetStatus.InReplyToID != "" && (targetStatus.Visibility == gtsmodel.VisibilityFollowersOnly || targetStatus.Visibility == gtsmodel.VisibilityDirect) {
-			followsRepliedAccount, err := f.db.IsFollowing(ctx, requestingAccount, relevantAccounts.InReplyToAccount)
-			if err != nil {
-				return false, err
-			}
-			if !followsRepliedAccount {
-				l.Trace("target status is a followers-only reply to an account that is not followed by the requesting account")
-				return false, nil
-			}
 		}
 	}
 
@@ -218,10 +204,9 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 	// that means it's now just a matter of checking the visibility settings of the status itself
 	switch targetStatus.Visibility {
 	case gtsmodel.VisibilityPublic, gtsmodel.VisibilityUnlocked:
-		// no problem here, just return OK
-		return true, nil
+		// no problem here
 	case gtsmodel.VisibilityFollowersOnly:
-		// check one-way follow
+		// Followers-only post, check for a one-way follow to target
 		follows, err := f.db.IsFollowing(ctx, requestingAccount, targetAccount)
 		if err != nil {
 			return false, err
@@ -230,9 +215,8 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 			l.Trace("requested status is followers only but requesting account is not a follower")
 			return false, nil
 		}
-		return true, nil
 	case gtsmodel.VisibilityMutualsOnly:
-		// check mutual follow
+		// Mutuals-only post, check for a mutual follow
 		mutuals, err := f.db.IsMutualFollowing(ctx, requestingAccount, targetAccount)
 		if err != nil {
 			return false, err
@@ -241,11 +225,13 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 			l.Trace("requested status is mutuals only but accounts aren't mufos")
 			return false, nil
 		}
-		return true, nil
 	case gtsmodel.VisibilityDirect:
-		l.Trace("requesting account requests a status it's not mentioned in")
+		l.Trace("requesting account requests a direct status it's not mentioned in")
 		return false, nil // it's not mentioned -_-
 	}
+
+	// If we reached here, all is okay
+	return true, nil
 
 	return false, errors.New("reached the end of StatusVisible with no result")
 }
