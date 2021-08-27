@@ -20,7 +20,6 @@ package visibility
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/sirupsen/logrus"
@@ -232,6 +231,4 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 
 	// If we reached here, all is okay
 	return true, nil
-
-	return false, errors.New("reached the end of StatusVisible with no result")
 }
