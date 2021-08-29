@@ -28,10 +28,6 @@ import (
 )
 
 func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Status, requestingAccount *gtsmodel.Account) (bool, error) {
-	return f.statusVisible(ctx, targetStatus, requestingAccount)
-}
-
-func (f *filter) statusVisible(ctx context.Context, targetStatus *gtsmodel.Status, requestingAccount *gtsmodel.Account) (bool, error) {
 	const getBoosted = true
 
 	l := f.log.WithFields(logrus.Fields{
