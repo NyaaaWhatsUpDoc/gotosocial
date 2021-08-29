@@ -216,8 +216,7 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 		follows, err := f.db.IsFollowing(ctx, requestingAccount, targetAccount)
 		if err != nil {
 			return false, err
-		}
-		if !follows {
+		} else if !follows {
 			l.Trace("requested status is followers only but requesting account is not a follower")
 			return false, nil
 		}
@@ -226,8 +225,7 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 		mutuals, err := f.db.IsMutualFollowing(ctx, requestingAccount, targetAccount)
 		if err != nil {
 			return false, err
-		}
-		if !mutuals {
+		} else if !mutuals {
 			l.Trace("requested status is mutuals only but accounts aren't mufos")
 			return false, nil
 		}
