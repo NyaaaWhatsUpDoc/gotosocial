@@ -28,30 +28,37 @@ import (
 )
 
 func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Status, requestingAccount *gtsmodel.Account) (bool, error) {
+	return f.statusVisible(ctx, targetStatus, requestingAccount)
+}
+
+func (f *filter) statusVisible(ctx context.Context, targetStatus *gtsmodel.Status, requestingAccount *gtsmodel.Account) (bool, error) {
+	const getBoosted = true
+
 	l := f.log.WithFields(logrus.Fields{
 		"func":     "StatusVisible",
 		"statusID": targetStatus.ID,
 	})
 
-	getBoosted := true
+	// Fetch any relevant accounts for the target status
 	relevantAccounts, err := f.relevantAccounts(ctx, targetStatus, getBoosted)
 	if err != nil {
 		l.Debugf("error pulling relevant accounts for status %s: %s", targetStatus.ID, err)
 		return false, fmt.Errorf("StatusVisible: error pulling relevant accounts for status %s: %s", targetStatus.ID, err)
 	}
 
+	// Check we have determined a target account
+	targetAccount := relevantAccounts.Account
+	if targetAccount == nil {
+		l.Trace("target account is not set")
+		return false, nil
+	}
+
+	// Check for domain blocks among relevant accounts
 	domainBlocked, err := f.domainBlockedRelevant(ctx, relevantAccounts)
 	if err != nil {
 		l.Debugf("error checking domain block: %s", err)
 		return false, fmt.Errorf("error checking domain block: %s", err)
-	}
-	if domainBlocked {
-		return false, nil
-	}
-
-	targetAccount := relevantAccounts.Account
-	if targetAccount == nil {
-		l.Trace("target account is not set")
+	} else if domainBlocked {
 		return false, nil
 	}
 
@@ -163,19 +170,6 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 		}
 	}
 
-	// status mentions accounts
-	for _, a := range relevantAccounts.MentionedAccounts {
-		if a == nil {
-			continue
-		}
-		if blocked, err := f.db.IsBlocked(ctx, a.ID, requestingAccount.ID, true); err != nil {
-			return false, err
-		} else if blocked {
-			l.Trace("a block exists between requesting account and a mentioned account")
-			return false, nil
-		}
-	}
-
 	// boost mentions accounts
 	for _, a := range relevantAccounts.BoostedMentionedAccounts {
 		if a == nil {
@@ -189,14 +183,31 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 		}
 	}
 
-	// if the requesting account is mentioned in the status it should always be visible
-	for _, acct := range relevantAccounts.MentionedAccounts {
-		if acct == nil {
+	// Iterate mentions to check for blocks or requester mentions
+	isMentioned, blockAmongMentions := false, false
+	for _, a := range relevantAccounts.MentionedAccounts {
+		if a == nil {
 			continue
 		}
-		if acct.ID == requestingAccount.ID {
-			return true, nil // yep it's mentioned!
+
+		if blocked, err := f.db.IsBlocked(ctx, a.ID, requestingAccount.ID, true); err != nil {
+			return false, err
+		} else if blocked {
+			blockAmongMentions = true
+			break
 		}
+
+		if a.ID == requestingAccount.ID {
+			isMentioned = true
+		}
+	}
+
+	if blockAmongMentions {
+		l.Trace("a block exists between requesting account and a mentioned account")
+		return false, nil
+	} else if isMentioned {
+		// Requester mentioned, should always be visible
+		return true, nil
 	}
 
 	// at this point we know neither account blocks the other, or another account mentioned or otherwise referred to in the status
