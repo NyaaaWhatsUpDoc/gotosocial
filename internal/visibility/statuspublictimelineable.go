@@ -20,7 +20,6 @@ package visibility
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/sirupsen/logrus"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
@@ -32,8 +31,13 @@ func (f *filter) StatusPublictimelineable(ctx context.Context, targetStatus *gts
 		"statusID": targetStatus.ID,
 	})
 
-	// Don't timeline a reply
-	if targetStatus.InReplyToURI != "" || targetStatus.InReplyToID != "" || targetStatus.InReplyToAccountID != "" {
+	// Boosts should not be visible on federated timeline
+	if targetStatus.BoostOfID != "" {
+		return false, nil
+	}
+
+	// If reply isn't part of a single-author thread, don't timeline
+	if targetStatus.InReplyToID != "" && len(targetStatus.MentionIDs) > 0 {
 		return false, nil
 	}
 
@@ -42,15 +46,10 @@ func (f *filter) StatusPublictimelineable(ctx context.Context, targetStatus *gts
 		return true, nil
 	}
 
-	v, err := f.StatusVisible(ctx, targetStatus, timelineOwnerAccount)
-	if err != nil {
-		return false, fmt.Errorf("StatusPublictimelineable: error checking visibility of status with id %s: %s", targetStatus.ID, err)
+	// Perform a regular visibility check for the status
+	visible, err := f.StatusVisible(ctx, targetStatus, timelineOwnerAccount)
+	if !visible && err == nil {
+		l.Debug("status is not publicTimelinable because it's not visible to requester")
 	}
-
-	if !v {
-		l.Debug("status is not publicTimelineable because it's not visible to the requester")
-		return false, nil
-	}
-
-	return true, nil
+	return visible, err
 }
