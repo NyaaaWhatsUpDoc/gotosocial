@@ -3,7 +3,6 @@ module github.com/superseriousbusiness/gotosocial
 go 1.16
 
 require (
-	github.com/ReneKroon/ttlcache v1.7.0
 	github.com/buckket/go-blurhash v1.1.0
 	github.com/coreos/go-oidc/v3 v3.0.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
@@ -32,6 +31,7 @@ require (
 	github.com/jackc/pgconn v1.10.0
 	github.com/jackc/pgx/v4 v4.13.0
 	github.com/json-iterator/go v1.1.11 // indirect
+	github.com/kpango/fastime v1.0.17
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.15
