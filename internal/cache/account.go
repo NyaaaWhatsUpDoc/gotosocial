@@ -86,10 +86,11 @@ func (c *AccountCache) SetUpdateCallback(hook UpdateHook) {
 
 // GetByID attempts to fetch a account from the cache by its ID, you will receive a copy for thread-safety
 func (c *AccountCache) GetByID(id string) (*gtsmodel.Account, bool) {
-	c.cache.mutex.Lock()
-	account, ok := c.getByID(id)
-	c.cache.mutex.Unlock()
-	return account, ok
+	v, ok := c.cache.Get(id)
+	if !ok {
+		return nil, false
+	}
+	return copyAccount(v.(*gtsmodel.Account)), true
 }
 
 // GetByURL attempts to fetch a account from the cache by its URL, you will receive a copy for thread-safety
@@ -105,9 +106,14 @@ func (c *AccountCache) GetByURL(url string) (*gtsmodel.Account, bool) {
 	}
 
 	// Attempt account lookup
-	account, ok := c.getByID(id)
+	v, ok := c.cache.get(id)
 	c.cache.mutex.Unlock()
-	return account, ok
+
+	if !ok {
+		return nil, false
+	}
+
+	return copyAccount(v.(*gtsmodel.Account)), true
 }
 
 // GetByURI attempts to fetch a account from the cache by its URI, you will receive a copy for thread-safety
@@ -123,17 +129,13 @@ func (c *AccountCache) GetByURI(uri string) (*gtsmodel.Account, bool) {
 	}
 
 	// Attempt account lookup
-	account, ok := c.getByID(id)
-	c.cache.mutex.Unlock()
-	return account, ok
-}
-
-// getByID performs an unsafe (no mutex locks) lookup of account by ID, returning a copy of account in cache
-func (c *AccountCache) getByID(id string) (*gtsmodel.Account, bool) {
 	v, ok := c.cache.get(id)
+	c.cache.mutex.Unlock()
+
 	if !ok {
 		return nil, false
 	}
+
 	return copyAccount(v.(*gtsmodel.Account)), true
 }
 

@@ -31,7 +31,7 @@ import (
 type notificationDB struct {
 	config *config.Config
 	conn   *DBConn
-	cache  *cache.Cache
+	cache  *cache.NotificationCache
 }
 
 func (n *notificationDB) newNotificationQ(i interface{}) *bun.SelectQuery {
@@ -44,7 +44,7 @@ func (n *notificationDB) newNotificationQ(i interface{}) *bun.SelectQuery {
 }
 
 func (n *notificationDB) GetNotification(ctx context.Context, id string) (*gtsmodel.Notification, db.Error) {
-	if notification, cached := n.getNotificationCache(id); cached {
+	if notification, cached := n.cache.Get(id); cached {
 		return notification, nil
 	}
 
@@ -93,7 +93,7 @@ func (n *notificationDB) GetNotifications(ctx context.Context, accountID string,
 	// reason for this is that for each notif, we can instead get it from our cache if it's cached
 	for i, notif := range notifications {
 		// Check cache for notification
-		nn, cached := n.getNotificationCache(notif.ID)
+		nn, cached := n.cache.Get(notif.ID)
 		if cached {
 			notifications[i] = nn
 			continue
@@ -109,18 +109,6 @@ func (n *notificationDB) GetNotifications(ctx context.Context, accountID string,
 	return notifications, nil
 }
 
-func (n *notificationDB) getNotificationCache(id string) (*gtsmodel.Notification, bool) {
-	v, ok := n.cache.Get(id)
-	if !ok {
-		return nil, false
-	}
-	return v.(*gtsmodel.Notification), true
-}
-
-func (n *notificationDB) putNotificationCache(notif *gtsmodel.Notification) {
-	n.cache.Set(notif.ID, notif)
-}
-
 func (n *notificationDB) getNotificationDB(ctx context.Context, id string, dst *gtsmodel.Notification) error {
 	q := n.newNotificationQ(dst).
 		Where("notification.id = ?", id)
@@ -130,6 +118,6 @@ func (n *notificationDB) getNotificationDB(ctx context.Context, id string, dst *
 		return n.conn.ProcessError(err)
 	}
 
-	n.putNotificationCache(dst)
+	n.cache.Set(dst)
 	return nil
 }

@@ -26,11 +26,19 @@ type Cache struct {
 
 // init performs Cache initialization
 func (c *Cache) init() {
+	// Initialize the cache itself
 	c.cache = make(map[string]*entry, 100)
 	c.evict = emptyEvict
 	c.update = emptyUpdate
 	c.ttl = time.Minute * 5
-	go c.cleanup()
+
+	// Add to global caches
+	mutex.Lock()
+	caches = append(caches, c)
+	mutex.Unlock()
+
+	// Ensure reaper is started
+	once.Do(func() { go reaper() })
 }
 
 // New returns a new basic cache
@@ -38,17 +46,6 @@ func New() *Cache {
 	c := Cache{}
 	c.init()
 	return &c
-}
-
-// cleanup performs regular cache sweeps
-func (c *Cache) cleanup() {
-	for {
-		// Rest now little CPU, save your cycles...
-		time.Sleep(clockPrecision * 100)
-
-		// Sweep-out dusty items
-		c.sweep()
-	}
 }
 
 // sweep evicts expired items (with callback!) from cache

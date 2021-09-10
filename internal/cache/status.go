@@ -86,10 +86,11 @@ func (c *StatusCache) SetUpdateCallback(hook UpdateHook) {
 
 // GetByID attempts to fetch a status from the cache by its ID, you will receive a copy for thread-safety
 func (c *StatusCache) GetByID(id string) (*gtsmodel.Status, bool) {
-	c.cache.mutex.Lock()
-	status, ok := c.getByID(id)
-	c.cache.mutex.Unlock()
-	return status, ok
+	v, ok := c.cache.Get(id)
+	if !ok {
+		return nil, false
+	}
+	return copyStatus(v.(*gtsmodel.Status)), true
 }
 
 // GetByURL attempts to fetch a status from the cache by its URL, you will receive a copy for thread-safety
@@ -105,9 +106,14 @@ func (c *StatusCache) GetByURL(url string) (*gtsmodel.Status, bool) {
 	}
 
 	// Attempt status lookup
-	status, ok := c.getByID(id)
+	v, ok := c.cache.get(id)
 	c.cache.mutex.Unlock()
-	return status, ok
+
+	if !ok {
+		return nil, false
+	}
+
+	return copyStatus(v.(*gtsmodel.Status)), ok
 }
 
 // GetByURI attempts to fetch a status from the cache by its URI, you will receive a copy for thread-safety
@@ -123,18 +129,14 @@ func (c *StatusCache) GetByURI(uri string) (*gtsmodel.Status, bool) {
 	}
 
 	// Attempt status lookup
-	status, ok := c.getByID(id)
-	c.cache.mutex.Unlock()
-	return status, ok
-}
-
-// getByID performs an unsafe (no mutex locks) lookup of status by ID, returning a copy of status in cache
-func (c *StatusCache) getByID(id string) (*gtsmodel.Status, bool) {
 	v, ok := c.cache.get(id)
+	c.cache.mutex.Unlock()
+
 	if !ok {
 		return nil, false
 	}
-	return copyStatus(v.(*gtsmodel.Status)), true
+
+	return copyStatus(v.(*gtsmodel.Status)), ok
 }
 
 // Set places a status in the cache, ensuring that the object placed is a copy for thread-safety

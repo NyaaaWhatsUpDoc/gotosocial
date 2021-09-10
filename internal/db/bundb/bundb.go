@@ -193,7 +193,7 @@ func NewBunDBService(ctx context.Context, c *config.Config, log *logrus.Logger) 
 		Notification: &notificationDB{
 			config: c,
 			conn:   conn,
-			cache:  cache.New(),
+			cache:  cache.NewNotification(),
 		},
 		Relationship: &relationshipDB{
 			config: c,
