@@ -122,7 +122,7 @@ func (s *statusDB) getStatus(ctx context.Context, cacheGet func() (*gtsmodel.Sta
 		}
 
 		// Place in the cache
-		s.cache.Put(status)
+		s.cache.Set(status)
 	}
 
 	// Set the status author account

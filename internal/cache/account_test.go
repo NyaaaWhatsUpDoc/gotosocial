@@ -20,7 +20,7 @@ func (suite *AccountCacheTestSuite) SetupSuite() {
 }
 
 func (suite *AccountCacheTestSuite) SetupTest() {
-	suite.cache = cache.NewAccountCache()
+	suite.cache = cache.NewAccount()
 }
 
 func (suite *AccountCacheTestSuite) TearDownTest() {
@@ -31,7 +31,7 @@ func (suite *AccountCacheTestSuite) TearDownTest() {
 func (suite *AccountCacheTestSuite) TestAccountCache() {
 	for _, account := range suite.data {
 		// Place in the cache
-		suite.cache.Put(account)
+		suite.cache.Set(account)
 	}
 
 	for _, account := range suite.data {

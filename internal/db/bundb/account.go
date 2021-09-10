@@ -96,7 +96,7 @@ func (a *accountDB) getAccount(ctx context.Context, cacheGet func() (*gtsmodel.A
 		}
 
 		// Place in the cache
-		a.cache.Put(account)
+		a.cache.Set(account)
 	}
 
 	return account, nil
@@ -119,7 +119,7 @@ func (a *accountDB) UpdateAccount(ctx context.Context, account *gtsmodel.Account
 
 	// Place updated account in cache
 	// (this will replace existing, i.e. invalidating)
-	a.cache.Put(account)
+	a.cache.Set(account)
 
 	return account, nil
 }

@@ -21,7 +21,7 @@ package bundb
 import (
 	"context"
 
-	"github.com/ReneKroon/ttlcache"
+	"github.com/superseriousbusiness/gotosocial/internal/cache"
 	"github.com/superseriousbusiness/gotosocial/internal/config"
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
@@ -31,7 +31,7 @@ import (
 type notificationDB struct {
 	config *config.Config
 	conn   *DBConn
-	cache  *ttlcache.Cache
+	cache  *cache.Cache
 }
 
 func (n *notificationDB) newNotificationQ(i interface{}) *bun.SelectQuery {

@@ -30,7 +30,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/stdlib"
 	"github.com/sirupsen/logrus"
@@ -162,7 +161,7 @@ func NewBunDBService(ctx context.Context, c *config.Config, log *logrus.Logger) 
 		return nil, fmt.Errorf("db migration error: %s", err)
 	}
 
-	accounts := &accountDB{config: c, conn: conn, cache: cache.NewAccountCache()}
+	accounts := &accountDB{config: c, conn: conn, cache: cache.NewAccount()}
 
 	ps := &bunDBService{
 		Account: accounts,
@@ -189,12 +188,12 @@ func NewBunDBService(ctx context.Context, c *config.Config, log *logrus.Logger) 
 		Mention: &mentionDB{
 			config: c,
 			conn:   conn,
-			cache:  ttlcache.NewCache(),
+			cache:  cache.New(),
 		},
 		Notification: &notificationDB{
 			config: c,
 			conn:   conn,
-			cache:  ttlcache.NewCache(),
+			cache:  cache.New(),
 		},
 		Relationship: &relationshipDB{
 			config: c,
@@ -207,7 +206,7 @@ func NewBunDBService(ctx context.Context, c *config.Config, log *logrus.Logger) 
 		Status: &statusDB{
 			config:   c,
 			conn:     conn,
-			cache:    cache.NewStatusCache(),
+			cache:    cache.NewStatus(),
 			accounts: accounts,
 		},
 		Timeline: &timelineDB{

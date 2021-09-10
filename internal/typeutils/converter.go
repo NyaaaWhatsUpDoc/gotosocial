@@ -26,7 +26,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/superseriousbusiness/gotosocial/internal/ap"
 	"github.com/superseriousbusiness/gotosocial/internal/api/model"
-	"github.com/superseriousbusiness/gotosocial/internal/cache"
 	"github.com/superseriousbusiness/gotosocial/internal/config"
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
@@ -178,20 +177,16 @@ type TypeConverter interface {
 }
 
 type converter struct {
-	config        *config.Config
-	db            db.DB
-	log           *logrus.Logger
-	frontendCache cache.Cache
-	asCache       cache.Cache
+	config *config.Config
+	db     db.DB
+	log    *logrus.Logger
 }
 
 // NewConverter returns a new Converter
 func NewConverter(config *config.Config, db db.DB, log *logrus.Logger) TypeConverter {
 	return &converter{
-		config:        config,
-		db:            db,
-		log:           log,
-		frontendCache: cache.New(),
-		asCache:       cache.New(),
+		config: config,
+		db:     db,
+		log:    log,
 	}
 }

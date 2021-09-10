@@ -20,7 +20,7 @@ func (suite *StatusCacheTestSuite) SetupSuite() {
 }
 
 func (suite *StatusCacheTestSuite) SetupTest() {
-	suite.cache = cache.NewStatusCache()
+	suite.cache = cache.NewStatus()
 }
 
 func (suite *StatusCacheTestSuite) TearDownTest() {
@@ -31,7 +31,7 @@ func (suite *StatusCacheTestSuite) TearDownTest() {
 func (suite *StatusCacheTestSuite) TestStatusCache() {
 	for _, status := range suite.data {
 		// Place in the cache
-		suite.cache.Put(status)
+		suite.cache.Set(status)
 	}
 
 	for _, status := range suite.data {
@@ -41,15 +41,15 @@ func (suite *StatusCacheTestSuite) TestStatusCache() {
 		// Check we can retrieve
 		check, ok = suite.cache.GetByID(status.ID)
 		if !ok && !statusIs(status, check) {
-			suite.Fail("Failed to fetch expected account with ID: %s", status.ID)
+			suite.Fail("Failed to fetch expected account with ID")
 		}
 		check, ok = suite.cache.GetByURI(status.URI)
-		if status.URI != "" && !ok && !statusIs(status, check) {
-			suite.Fail("Failed to fetch expected account with URI: %s", status.URI)
+		if status.URI != "" && (!ok || !statusIs(status, check)) {
+			suite.Fail("Failed to fetch expected account with URI")
 		}
 		check, ok = suite.cache.GetByURL(status.URL)
-		if status.URL != "" && !ok && !statusIs(status, check) {
-			suite.Fail("Failed to fetch expected account with URL: %s", status.URL)
+		if status.URL != "" && (!ok || !statusIs(status, check)) {
+			suite.Fail("Failed to fetch expected account with URL")
 		}
 	}
 }

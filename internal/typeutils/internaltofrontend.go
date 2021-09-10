@@ -63,18 +63,6 @@ func (c *converter) AccountToMastoSensitive(ctx context.Context, a *gtsmodel.Acc
 }
 
 func (c *converter) AccountToMastoPublic(ctx context.Context, a *gtsmodel.Account) (*model.Account, error) {
-	if a == nil {
-		return nil, fmt.Errorf("given account was nil")
-	}
-
-	// first check if we have this account in our frontEnd cache
-	if accountI, err := c.frontendCache.Fetch(a.ID); err == nil {
-		if account, ok := accountI.(*model.Account); ok {
-			// we have it, so just return it as-is
-			return account, nil
-		}
-	}
-
 	// count followers
 	followersCount, err := c.db.CountAccountFollowedBy(ctx, a.ID, false)
 	if err != nil {
@@ -182,11 +170,6 @@ func (c *converter) AccountToMastoPublic(ctx context.Context, a *gtsmodel.Accoun
 		Emojis:         emojis, // TODO: implement this
 		Fields:         fields,
 		Suspended:      suspended,
-	}
-
-	// put the account in our cache in case we need it again soon
-	if err := c.frontendCache.Store(a.ID, accountFrontend); err != nil {
-		return nil, err
 	}
 
 	return accountFrontend, nil
@@ -711,7 +694,6 @@ func (c *converter) NotificationToMasto(ctx context.Context, n *gtsmodel.Notific
 }
 
 func (c *converter) DomainBlockToMasto(ctx context.Context, b *gtsmodel.DomainBlock, export bool) (*model.DomainBlock, error) {
-
 	domainBlock := &model.DomainBlock{
 		Domain:        b.Domain,
 		PublicComment: b.PublicComment,
