@@ -20,6 +20,7 @@ package main
 
 import (
 	"github.com/superseriousbusiness/gotosocial/internal/cliactions/admin/account"
+	"github.com/superseriousbusiness/gotosocial/internal/cliactions/admin/refresh"
 	"github.com/superseriousbusiness/gotosocial/internal/cliactions/admin/trans"
 	"github.com/superseriousbusiness/gotosocial/internal/config"
 	"github.com/urfave/cli/v2"
@@ -176,6 +177,13 @@ func adminCommands() []*cli.Command {
 					},
 					Action: func(c *cli.Context) error {
 						return runAction(c, trans.Import)
+					},
+				},
+				{
+					Name:  "force-refresh",
+					Usage: "Force refresh remote data in the database",
+					Action: func(c *cli.Context) error {
+						return runAction(c, refresh.ForceRefresh)
 					},
 				},
 			},
