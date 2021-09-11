@@ -11,7 +11,7 @@ type StatusCache struct {
 	urls  map[string]string // map of status URLs -> IDs
 }
 
-// NewStatus returns a new instantiated statusCache object
+// NewStatus returns a new instantiated StatusCache object
 func NewStatus() *StatusCache {
 	c := StatusCache{}
 	c.cache.init()

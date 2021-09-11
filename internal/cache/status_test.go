@@ -41,15 +41,15 @@ func (suite *StatusCacheTestSuite) TestStatusCache() {
 		// Check we can retrieve
 		check, ok = suite.cache.GetByID(status.ID)
 		if !ok && !statusIs(status, check) {
-			suite.Fail("Failed to fetch expected account with ID")
+			suite.Fail("Failed to fetch expected status with ID")
 		}
 		check, ok = suite.cache.GetByURI(status.URI)
 		if status.URI != "" && (!ok || !statusIs(status, check)) {
-			suite.Fail("Failed to fetch expected account with URI")
+			suite.Fail("Failed to fetch expected status with URI")
 		}
 		check, ok = suite.cache.GetByURL(status.URL)
 		if status.URL != "" && (!ok || !statusIs(status, check)) {
-			suite.Fail("Failed to fetch expected account with URL")
+			suite.Fail("Failed to fetch expected status with URL")
 		}
 	}
 }

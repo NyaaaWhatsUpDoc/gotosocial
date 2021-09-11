@@ -9,14 +9,22 @@ type NotificationCache struct {
 	cache Cache
 }
 
-// NewStatus returns a new instantiated statusCache object
+// NewStatus returns a new instantiated NotificationCache object
 func NewNotification() *NotificationCache {
 	c := NotificationCache{}
 	c.cache.init()
 	return &c
 }
 
-// GetByID attempts to fetch a notification from the cache by its ID, you will receive a copy for thread-safety
+func (c *NotificationCache) SetEvictionCallback(hook EvictHook) {
+	c.cache.SetEvictionCallback(hook)
+}
+
+func (c *NotificationCache) SetUpdateCallback(hook UpdateHook) {
+	c.cache.SetUpdateCallback(hook)
+}
+
+// Get attempts to fetch a notification from the cache by its ID, you will receive a copy for thread-safety
 func (c *NotificationCache) Get(id string) (*gtsmodel.Notification, bool) {
 	v, ok := c.cache.Get(id)
 	if !ok {
@@ -29,7 +37,7 @@ func (c *NotificationCache) Get(id string) (*gtsmodel.Notification, bool) {
 func (c *NotificationCache) Set(notif *gtsmodel.Notification) {
 	// Check for valid input status
 	if notif == nil || notif.ID == "" {
-		panic("invalid status")
+		panic("invalid notification")
 	}
 
 	// Safely set item in cache
