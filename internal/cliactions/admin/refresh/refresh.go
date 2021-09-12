@@ -25,6 +25,7 @@ import (
 	"net/url"
 
 	"git.iim.gay/grufwub/go-store/kv"
+	"git.iim.gay/grufwub/go-store/storage"
 	"github.com/sirupsen/logrus"
 	"github.com/superseriousbusiness/gotosocial/internal/cliactions"
 	"github.com/superseriousbusiness/gotosocial/internal/config"
@@ -34,9 +35,6 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/federation/federatingdb"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/media"
-	"github.com/superseriousbusiness/gotosocial/internal/oauth"
-	"github.com/superseriousbusiness/gotosocial/internal/processing"
-	"github.com/superseriousbusiness/gotosocial/internal/timeline"
 	"github.com/superseriousbusiness/gotosocial/internal/transport"
 	"github.com/superseriousbusiness/gotosocial/internal/typeutils"
 )
@@ -52,23 +50,21 @@ func ForceRefresh(ctx context.Context, cfg *config.Config, log *logrus.Logger) e
 	}
 
 	// Open the storage backend
-	storage, err := kv.OpenFile(cfg.StorageConfig.BasePath, nil)
+	storage, err := kv.OpenFile(cfg.StorageConfig.BasePath, &storage.DiskConfig{
+		Overwrite: true, // allow overwrites for this refresh
+	})
 	if err != nil {
 		return fmt.Errorf("error creating storage backend: %s", err)
 	}
 
 	// Build converters and utils
 	typeConv := typeutils.NewConverter(cfg, dbConn, log)
-	timelineMgr := timeline.NewManager(dbConn, typeConv, cfg, log)
 
 	// Build backend handlers
 	media := media.New(cfg, dbConn, storage, log)
-	oauth := oauth.New(dbConn, log)
 	transportCtrl := transport.NewController(cfg, dbConn, &federation.Clock{}, http.DefaultClient, log)
 	fedDB := federatingdb.New(dbConn, cfg, log)
 	federator := federation.NewFederator(dbConn, fedDB, transportCtrl, cfg, log, typeConv, media)
-	processor := processing.NewProcessor(cfg, typeConv, federator, oauth, media, storage, timelineMgr, dbConn, log)
-	_ = processor
 
 	// Fetch all remote accounts from DB
 	accounts := []*gtsmodel.Account{}
@@ -84,6 +80,8 @@ func ForceRefresh(ctx context.Context, cfg *config.Config, log *logrus.Logger) e
 		if err != nil {
 			return fmt.Errorf("account with invalid URI in DB: %s", err)
 		}
+
+		log.Infof("refreshing account: %s", accURI)
 
 		// Perform a force refresh of the remote account
 		_, _, err = federator.GetRemoteAccount(ctx, "gotosocial_admin_cli", accURI, true)
@@ -107,6 +105,8 @@ func ForceRefresh(ctx context.Context, cfg *config.Config, log *logrus.Logger) e
 			return fmt.Errorf("status with invalid URI in DB: %s", err)
 		}
 
+		log.Infof("refreshing status: %s", statusURI)
+
 		// Perform a force refresh of the remote status
 		_, _, _, err = federator.GetRemoteStatus(ctx, "gotosocial_admin_cli", statusURI, true, false, false)
 		if err != nil {
@@ -128,6 +128,8 @@ func ForceRefresh(ctx context.Context, cfg *config.Config, log *logrus.Logger) e
 		if err != nil {
 			return fmt.Errorf("error refreshing remote media attachment: %s", err)
 		}
+
+		log.Infof("refreshing media attachment: %s", attach.File.Path)
 
 		// Update the media attachment in DB
 		err = dbConn.UpdateByPrimaryKey(ctx, attach)
