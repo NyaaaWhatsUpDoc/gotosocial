@@ -68,7 +68,7 @@ func ForceRefresh(ctx context.Context, cfg *config.Config, log *logrus.Logger) e
 
 	// Fetch all remote accounts from DB
 	accounts := []*gtsmodel.Account{}
-	err = dbConn.GetWhere(ctx, []db.Where{{Key: "domain", Value: nil}}, &accounts)
+	err = dbConn.GetWhere(ctx, []db.Where{{Key: "domain", Value: nil, Not: true}}, &accounts)
 	if err != nil {
 		return fmt.Errorf("error fetching accounts from DB: %s", err)
 	}
