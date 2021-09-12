@@ -68,9 +68,9 @@ func ForceRefresh(ctx context.Context, cfg *config.Config, log *logrus.Logger) e
 
 	// Fetch all remote accounts from DB
 	accounts := []*gtsmodel.Account{}
-	err = dbConn.GetWhere(ctx, []db.Where{{Key: "domain", Value: ""}}, accounts)
+	err = dbConn.GetWhere(ctx, []db.Where{{Key: "domain", Value: ""}}, &accounts)
 	if err != nil {
-		return fmt.Errorf("error fetch accounts from DB: %s", err)
+		return fmt.Errorf("error fetching accounts from DB: %s", err)
 	}
 
 	// Iterate accounts and fetch remote
@@ -92,7 +92,7 @@ func ForceRefresh(ctx context.Context, cfg *config.Config, log *logrus.Logger) e
 
 	// Fetch all remote statuses from DB
 	statuses := []*gtsmodel.Status{}
-	err = dbConn.GetWhere(ctx, []db.Where{{Key: "local", Value: false}}, statuses)
+	err = dbConn.GetWhere(ctx, []db.Where{{Key: "local", Value: false}}, &statuses)
 	if err != nil {
 		return fmt.Errorf("error fetching statuses from DB: %s", err)
 	}
@@ -116,7 +116,7 @@ func ForceRefresh(ctx context.Context, cfg *config.Config, log *logrus.Logger) e
 
 	// Fetch all remote media from DB
 	attachments := []*gtsmodel.MediaAttachment{}
-	err = dbConn.GetWhere(ctx, []db.Where{{Key: "remote_url", Value: "", Not: true}}, attachments)
+	err = dbConn.GetWhere(ctx, []db.Where{{Key: "remote_url", Value: "", Not: true}}, &attachments)
 	if err != nil {
 		return fmt.Errorf("error fetching media attachments from DB: %s", err)
 	}
