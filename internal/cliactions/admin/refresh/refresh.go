@@ -24,8 +24,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"git.iim.gay/grufwub/go-store/kv"
 	"github.com/sirupsen/logrus"
-	"github.com/superseriousbusiness/gotosocial/internal/blob"
 	"github.com/superseriousbusiness/gotosocial/internal/cliactions"
 	"github.com/superseriousbusiness/gotosocial/internal/config"
 	"github.com/superseriousbusiness/gotosocial/internal/db"
@@ -52,7 +52,7 @@ func ForceRefresh(ctx context.Context, cfg *config.Config, log *logrus.Logger) e
 	}
 
 	// Open the storage backend
-	storage, err := blob.NewLocal(cfg, log)
+	storage, err := kv.OpenFile(cfg.StorageConfig.BasePath, nil)
 	if err != nil {
 		return fmt.Errorf("error creating storage backend: %s", err)
 	}
@@ -74,7 +74,7 @@ func ForceRefresh(ctx context.Context, cfg *config.Config, log *logrus.Logger) e
 	accounts := []*gtsmodel.Account{}
 	err = dbConn.GetWhere(ctx, []db.Where{{Key: "domain", Value: nil}}, accounts)
 	if err != nil {
-		return fmt.Errorf("error fetch accounts from database")
+		return fmt.Errorf("error fetch accounts from DB: %s", err)
 	}
 
 	// Iterate accounts and fetch remote
@@ -82,13 +82,57 @@ func ForceRefresh(ctx context.Context, cfg *config.Config, log *logrus.Logger) e
 		// Parse the remote account URI
 		accURI, err := url.Parse(acc.URI)
 		if err != nil {
-			return fmt.Errorf("account with invalid URI in db: %s", err)
+			return fmt.Errorf("account with invalid URI in DB: %s", err)
 		}
 
 		// Perform a force refresh of the remote account
-		_, _, err = federator.GetRemoteAccount(ctx, acc.Username, accURI, true)
+		_, _, err = federator.GetRemoteAccount(ctx, "gotosocial_admin_cli", accURI, true)
 		if err != nil {
 			return fmt.Errorf("error refreshing remote account: %s", err)
+		}
+	}
+
+	// Fetch all remote statuses from DB
+	statuses := []*gtsmodel.Status{}
+	err = dbConn.GetWhere(ctx, []db.Where{{Key: "local", Value: false}}, statuses)
+	if err != nil {
+		return fmt.Errorf("error fetching statuses from DB: %s", err)
+	}
+
+	// Iterate statuses and fetch remote
+	for _, status := range statuses {
+		// Parse the remote status URI
+		statusURI, err := url.Parse(status.URI)
+		if err != nil {
+			return fmt.Errorf("status with invalid URI in DB: %s", err)
+		}
+
+		// Perform a force refresh of the remote status
+		_, _, _, err = federator.GetRemoteStatus(ctx, "gotosocial_admin_cli", statusURI, true, false, false)
+		if err != nil {
+			return fmt.Errorf("error refreshing remote status: %s", err)
+		}
+	}
+
+	// Fetch all remote media from DB
+	attachments := []*gtsmodel.MediaAttachment{}
+	err = dbConn.GetWhere(ctx, []db.Where{{Key: "remote_url", Value: nil, Not: true}}, attachments)
+	if err != nil {
+		return fmt.Errorf("error fetching media attachments from DB: %s", err)
+	}
+
+	// Iterate attachments and fetch remote
+	for _, attach := range attachments {
+		// Perform a force dereference of the remote attachment
+		attach, err = federator.RefreshAttachment(ctx, "gotosocial_admin_cli", attach)
+		if err != nil {
+			return fmt.Errorf("error refreshing remote media attachment: %s", err)
+		}
+
+		// Update the media attachment in DB
+		err = dbConn.UpdateByPrimaryKey(ctx, attach)
+		if err != nil {
+			return fmt.Errorf("error updating refreshed media attachment in DB: %s", err)
 		}
 	}
 

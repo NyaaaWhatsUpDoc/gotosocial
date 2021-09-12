@@ -22,8 +22,8 @@ import (
 	"context"
 	"fmt"
 
+	"git.iim.gay/grufwub/go-store/kv"
 	"github.com/sirupsen/logrus"
-	"github.com/superseriousbusiness/gotosocial/internal/blob"
 	"github.com/superseriousbusiness/gotosocial/internal/cliactions"
 	"github.com/superseriousbusiness/gotosocial/internal/config"
 	"github.com/superseriousbusiness/gotosocial/internal/db/bundb"
@@ -41,7 +41,7 @@ func Clean(ctx context.Context, cfg *config.Config, log *logrus.Logger) error {
 	}
 
 	// Open the storage backend
-	storage, err := blob.NewLocal(cfg, log)
+	storage, err := kv.OpenFile(cfg.StorageConfig.BasePath, nil)
 	if err != nil {
 		return fmt.Errorf("error creating storage backend: %s", err)
 	}
@@ -69,7 +69,7 @@ func Clean(ctx context.Context, cfg *config.Config, log *logrus.Logger) error {
 		filepath := attachment.File.Path
 
 		// Attempt to retrieve file at path
-		_, err := storage.RetrieveFileFrom(filepath)
+		_, err := storage.Get(filepath)
 		if err == nil {
 			// no issue!
 			continue

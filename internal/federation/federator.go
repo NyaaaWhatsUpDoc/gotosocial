@@ -67,6 +67,9 @@ type Federator interface {
 
 	GetRemoteInstance(ctx context.Context, username string, remoteInstanceURI *url.URL) (*gtsmodel.Instance, error)
 
+	GetRemoteAttachment(ctx context.Context, requestingUsername string, minAttachment *gtsmodel.MediaAttachment) (*gtsmodel.MediaAttachment, error)
+	RefreshAttachment(ctx context.Context, requestingUsername string, minAttachment *gtsmodel.MediaAttachment) (*gtsmodel.MediaAttachment, error)
+
 	// Handshaking returns true if the given username is currently in the process of dereferencing the remoteAccountID.
 	Handshaking(ctx context.Context, username string, remoteAccountID *url.URL) bool
 	pub.CommonBehavior

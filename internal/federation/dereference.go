@@ -53,3 +53,11 @@ func (f *federator) GetRemoteInstance(ctx context.Context, username string, remo
 func (f *federator) DereferenceAnnounce(ctx context.Context, announce *gtsmodel.Status, requestingUsername string) error {
 	return f.dereferencer.DereferenceAnnounce(ctx, announce, requestingUsername)
 }
+
+func (f *federator) GetRemoteAttachment(ctx context.Context, requestingUsername string, minAttachment *gtsmodel.MediaAttachment) (*gtsmodel.MediaAttachment, error) {
+	return f.dereferencer.GetRemoteAttachment(ctx, requestingUsername, minAttachment)
+}
+
+func (f *federator) RefreshAttachment(ctx context.Context, requestingUsername string, minAttachment *gtsmodel.MediaAttachment) (*gtsmodel.MediaAttachment, error) {
+	return f.dereferencer.RefreshAttachment(ctx, requestingUsername, minAttachment)
+}
