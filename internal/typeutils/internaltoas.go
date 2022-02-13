@@ -350,7 +350,7 @@ func (c *converter) AccountToASMinimal(ctx context.Context, a *gtsmodel.Account)
 
 func (c *converter) StatusToAS(ctx context.Context, s *gtsmodel.Status) (vocab.ActivityStreamsNote, error) {
 	// first check if we have this note in our asCache already
-	if noteI, err := c.asCache.Fetch(s.ID); err == nil {
+	if noteI, ok := c.asCache.Get(s.ID); ok {
 		if note, ok := noteI.(vocab.ActivityStreamsNote); ok {
 			// we have it, so just return it as-is
 			return note, nil
@@ -552,9 +552,7 @@ func (c *converter) StatusToAS(ctx context.Context, s *gtsmodel.Status) (vocab.A
 	status.SetActivityStreamsSensitive(sensitiveProp)
 
 	// put the note in our cache in case we need it again soon
-	if err := c.asCache.Store(s.ID, status); err != nil {
-		return nil, err
-	}
+	c.asCache.Set(s.ID, status)
 
 	return status, nil
 }

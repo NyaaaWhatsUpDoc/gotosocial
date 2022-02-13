@@ -31,7 +31,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/stdlib"
 	"github.com/sirupsen/logrus"
@@ -176,11 +175,11 @@ func NewBunDBService(ctx context.Context) (db.DB, error) {
 		},
 		Mention: &mentionDB{
 			conn:  conn,
-			cache: ttlcache.NewCache(),
+			cache: cache.NewMentionCache(),
 		},
 		Notification: &notificationDB{
 			conn:  conn,
-			cache: ttlcache.NewCache(),
+			cache: cache.NewNotificationCache(),
 		},
 		Relationship: &relationshipDB{
 			conn: conn,

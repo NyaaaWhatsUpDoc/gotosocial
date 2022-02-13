@@ -21,25 +21,17 @@ package cache
 import (
 	"time"
 
-	"github.com/ReneKroon/ttlcache"
+	"codeberg.org/gruf/go-cache"
 )
 
 // Cache defines an in-memory cache that is safe to be wiped when the application is restarted
-type Cache interface {
-	Store(k string, v interface{}) error
-	Fetch(k string) (interface{}, error)
-}
-
-type cache struct {
-	c *ttlcache.Cache
-}
+type Cache cache.Cache
 
 // New returns a new in-memory cache.
 func New() Cache {
-	c := ttlcache.NewCache()
-	c.SetTTL(5 * time.Minute)
-	cache := &cache{
-		c: c,
+	c := cache.New()
+	if !c.Stop() || !c.Start(time.Second*30) {
+		panic("failed starting cache")
 	}
-	return cache
+	return c
 }

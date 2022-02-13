@@ -1,6 +1,9 @@
 # codeberg.org/gruf/go-bytes v1.0.2
 ## explicit; go 1.14
 codeberg.org/gruf/go-bytes
+# codeberg.org/gruf/go-cache v1.1.2
+## explicit; go 1.17
+codeberg.org/gruf/go-cache
 # codeberg.org/gruf/go-errors v1.0.5
 ## explicit; go 1.15
 codeberg.org/gruf/go-errors
@@ -16,6 +19,9 @@ codeberg.org/gruf/go-hashenc
 # codeberg.org/gruf/go-mutexes v1.1.1
 ## explicit; go 1.14
 codeberg.org/gruf/go-mutexes
+# codeberg.org/gruf/go-nowish v1.1.0
+## explicit; go 1.14
+codeberg.org/gruf/go-nowish
 # codeberg.org/gruf/go-pools v1.0.2
 ## explicit; go 1.16
 codeberg.org/gruf/go-pools
@@ -27,9 +33,6 @@ codeberg.org/gruf/go-runners
 codeberg.org/gruf/go-store/kv
 codeberg.org/gruf/go-store/storage
 codeberg.org/gruf/go-store/util
-# github.com/ReneKroon/ttlcache v1.7.0
-## explicit; go 1.14
-github.com/ReneKroon/ttlcache
 # github.com/aymerick/douceur v0.2.0
 ## explicit
 github.com/aymerick/douceur/css

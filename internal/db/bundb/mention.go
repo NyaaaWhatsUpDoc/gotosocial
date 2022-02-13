@@ -21,7 +21,7 @@ package bundb
 import (
 	"context"
 
-	"github.com/ReneKroon/ttlcache"
+	"github.com/superseriousbusiness/gotosocial/internal/cache"
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/uptrace/bun"
@@ -29,7 +29,7 @@ import (
 
 type mentionDB struct {
 	conn  *DBConn
-	cache *ttlcache.Cache
+	cache *cache.MentionCache
 }
 
 func (m *mentionDB) newMentionQ(i interface{}) *bun.SelectQuery {
@@ -39,18 +39,6 @@ func (m *mentionDB) newMentionQ(i interface{}) *bun.SelectQuery {
 		Relation("Status").
 		Relation("OriginAccount").
 		Relation("TargetAccount")
-}
-
-func (m *mentionDB) getMentionCached(id string) (*gtsmodel.Mention, bool) {
-	v, ok := m.cache.Get(id)
-	if !ok {
-		return nil, false
-	}
-	return v.(*gtsmodel.Mention), true
-}
-
-func (m *mentionDB) putMentionCache(mention *gtsmodel.Mention) {
-	m.cache.Set(mention.ID, mention)
 }
 
 func (m *mentionDB) getMentionDB(ctx context.Context, id string) (*gtsmodel.Mention, db.Error) {
@@ -63,12 +51,12 @@ func (m *mentionDB) getMentionDB(ctx context.Context, id string) (*gtsmodel.Ment
 		return nil, m.conn.ProcessError(err)
 	}
 
-	m.putMentionCache(mention)
+	m.cache.Put(mention)
 	return mention, nil
 }
 
 func (m *mentionDB) GetMention(ctx context.Context, id string) (*gtsmodel.Mention, db.Error) {
-	if mention, cached := m.getMentionCached(id); cached {
+	if mention, cached := m.cache.GetByID(id); cached {
 		return mention, nil
 	}
 	return m.getMentionDB(ctx, id)
@@ -79,7 +67,7 @@ func (m *mentionDB) GetMentions(ctx context.Context, ids []string) ([]*gtsmodel.
 
 	for _, id := range ids {
 		// Attempt fetch from cache
-		mention, cached := m.getMentionCached(id)
+		mention, cached := m.cache.GetByID(id)
 		if cached {
 			mentions = append(mentions, mention)
 		}
