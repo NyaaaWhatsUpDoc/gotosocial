@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/oklog/ulid"
+	ulid "github.com/oklog/ulid/v2"
 )
 
 const randomRange = 631152381 // ~20 years in seconds

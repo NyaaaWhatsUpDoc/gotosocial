@@ -16,7 +16,6 @@ var (
 	assetsPath     = ""
 )
 
-// GetModuleRootPath returns the root-path of the module.
 func GetModuleRootPath() string {
 	if moduleRootPath == "" {
 		moduleRootPath = os.Getenv("PHOTOSHOPINFO_MODULE_ROOT_PATH")
@@ -54,7 +53,6 @@ func GetModuleRootPath() string {
 	return moduleRootPath
 }
 
-// GetTestAssetsPath returns the path of the test-assets.
 func GetTestAssetsPath() string {
 	if assetsPath == "" {
 		moduleRootPath := GetModuleRootPath()
@@ -64,7 +62,6 @@ func GetTestAssetsPath() string {
 	return assetsPath
 }
 
-// GetTestDataFilepath returns the file-path of the common test-data.
 func GetTestDataFilepath() string {
 	assetsPath := GetTestAssetsPath()
 	filepath := path.Join(assetsPath, testDataRelFilepath)

@@ -194,12 +194,10 @@ func (p *Polygon) Invert() {
 	// The empty and full polygons are handled specially.
 	if p.IsEmpty() {
 		*p = *FullPolygon()
-		p.initLoopProperties()
 		return
 	}
 	if p.IsFull() {
 		*p = Polygon{}
-		p.initLoopProperties()
 		return
 	}
 
@@ -246,7 +244,6 @@ func (p *Polygon) Invert() {
 			newLoops = append(newLoops, l)
 		}
 	}
-
 	p.loops = newLoops
 	p.initLoopProperties()
 }
@@ -386,7 +383,6 @@ func (p *Polygon) initOneLoop() {
 
 // initLoopProperties sets the properties for polygons with multiple loops.
 func (p *Polygon) initLoopProperties() {
-	p.numVertices = 0
 	// the loops depths are set by initNested/initOriented prior to this.
 	p.bound = EmptyRect()
 	p.hasHoles = false
@@ -406,8 +402,6 @@ func (p *Polygon) initLoopProperties() {
 // initEdgesAndIndex performs the shape related initializations and adds the final
 // polygon to the index.
 func (p *Polygon) initEdgesAndIndex() {
-	p.numEdges = 0
-	p.cumulativeEdges = nil
 	if p.IsFull() {
 		return
 	}
@@ -606,8 +600,13 @@ func (p *Polygon) ContainsPoint(point Point) bool {
 		return inside
 	}
 
-	// Otherwise we look up the ShapeIndex cell containing this point.
-	return NewContainsPointQuery(p.index, VertexModelSemiOpen).Contains(point)
+	// Otherwise, look up the ShapeIndex cell containing this point.
+	it := p.index.Iterator()
+	if !it.LocatePoint(point) {
+		return false
+	}
+
+	return p.iteratorContainsPoint(it, point)
 }
 
 // ContainsCell reports whether the polygon contains the given cell.

@@ -13,16 +13,16 @@ codeberg.org/gruf/go-format
 # codeberg.org/gruf/go-hashenc v1.0.1
 ## explicit; go 1.16
 codeberg.org/gruf/go-hashenc
-# codeberg.org/gruf/go-mutexes v1.1.0
+# codeberg.org/gruf/go-mutexes v1.1.1
 ## explicit; go 1.14
 codeberg.org/gruf/go-mutexes
 # codeberg.org/gruf/go-pools v1.0.2
 ## explicit; go 1.16
 codeberg.org/gruf/go-pools
-# codeberg.org/gruf/go-runners v1.2.0
+# codeberg.org/gruf/go-runners v1.2.1
 ## explicit; go 1.14
 codeberg.org/gruf/go-runners
-# codeberg.org/gruf/go-store v1.3.3
+# codeberg.org/gruf/go-store v1.3.5
 ## explicit; go 1.14
 codeberg.org/gruf/go-store/kv
 codeberg.org/gruf/go-store/storage
@@ -49,7 +49,7 @@ github.com/davecgh/go-spew/spew
 github.com/dsoprea/go-exif/v3
 github.com/dsoprea/go-exif/v3/common
 github.com/dsoprea/go-exif/v3/undefined
-# github.com/dsoprea/go-iptc v0.0.0-20200610044640-bc9ca208b413
+# github.com/dsoprea/go-iptc v0.0.0-20200609062250-162ae6b44feb
 ## explicit; go 1.13
 github.com/dsoprea/go-iptc
 # github.com/dsoprea/go-jpeg-image-structure/v2 v2.0.0-20210512043942-b434301c6836
@@ -58,7 +58,7 @@ github.com/dsoprea/go-jpeg-image-structure/v2
 # github.com/dsoprea/go-logging v0.0.0-20200710184922-b02d349568dd
 ## explicit; go 1.13
 github.com/dsoprea/go-logging
-# github.com/dsoprea/go-photoshop-info-format v0.0.0-20200610045659-121dd752914d
+# github.com/dsoprea/go-photoshop-info-format v0.0.0-20200609050348-3db9b63b202c
 ## explicit; go 1.13
 github.com/dsoprea/go-photoshop-info-format
 # github.com/dsoprea/go-png-image-structure/v2 v2.0.0-20210512210324-29b889a6093d
@@ -88,7 +88,7 @@ github.com/gin-gonic/gin/binding
 github.com/gin-gonic/gin/internal/bytesconv
 github.com/gin-gonic/gin/internal/json
 github.com/gin-gonic/gin/render
-# github.com/go-errors/errors v1.4.1
+# github.com/go-errors/errors v1.1.1
 ## explicit; go 1.14
 github.com/go-errors/errors
 # github.com/go-fed/httpsig v1.1.0
@@ -101,24 +101,22 @@ github.com/go-playground/locales/currency
 # github.com/go-playground/universal-translator v0.18.0
 ## explicit; go 1.13
 github.com/go-playground/universal-translator
-# github.com/go-playground/validator/v10 v10.9.0
+# github.com/go-playground/validator/v10 v10.10.0
 ## explicit; go 1.13
 github.com/go-playground/validator/v10
-# github.com/go-xmlfmt/xmlfmt v0.0.0-20211206191508-7fd73a941850
+# github.com/go-xmlfmt/xmlfmt v0.0.0-20191208150333-d5b6f63a941b
 ## explicit
 github.com/go-xmlfmt/xmlfmt
-# github.com/golang-jwt/jwt v3.2.2+incompatible
+# github.com/golang-jwt/jwt v3.2.1+incompatible
 ## explicit
 github.com/golang-jwt/jwt
-# github.com/golang/geo v0.0.0-20210211234256-740aa86cb551
+# github.com/golang/geo v0.0.0-20200319012246-673a6f80352d
 ## explicit; go 1.12
 github.com/golang/geo/r1
 github.com/golang/geo/r2
 github.com/golang/geo/r3
 github.com/golang/geo/s1
 github.com/golang/geo/s2
-# github.com/golang/mock v1.6.0
-## explicit; go 1.11
 # github.com/golang/protobuf v1.5.2
 ## explicit; go 1.9
 github.com/golang/protobuf/proto
@@ -137,7 +135,7 @@ github.com/gorilla/css/scanner
 # github.com/gorilla/securecookie v1.1.1
 ## explicit
 github.com/gorilla/securecookie
-# github.com/gorilla/sessions v1.2.1
+# github.com/gorilla/sessions v1.2.0
 ## explicit
 github.com/gorilla/sessions
 # github.com/gorilla/websocket v1.4.2
@@ -167,7 +165,7 @@ github.com/inconshreveable/mousetrap
 # github.com/jackc/chunkreader/v2 v2.0.1
 ## explicit; go 1.12
 github.com/jackc/chunkreader/v2
-# github.com/jackc/pgconn v1.10.1
+# github.com/jackc/pgconn v1.11.0
 ## explicit; go 1.12
 github.com/jackc/pgconn
 github.com/jackc/pgconn/internal/ctxwatch
@@ -184,10 +182,10 @@ github.com/jackc/pgproto3/v2
 # github.com/jackc/pgservicefile v0.0.0-20200714003250-2b9c44734f2b
 ## explicit; go 1.14
 github.com/jackc/pgservicefile
-# github.com/jackc/pgtype v1.9.1
+# github.com/jackc/pgtype v1.10.0
 ## explicit; go 1.13
 github.com/jackc/pgtype
-# github.com/jackc/pgx/v4 v4.14.1
+# github.com/jackc/pgx/v4 v4.15.0
 ## explicit; go 1.13
 github.com/jackc/pgx/v4
 github.com/jackc/pgx/v4/internal/sanitize
@@ -210,7 +208,7 @@ github.com/magiconair/properties
 # github.com/mattn/go-isatty v0.0.14
 ## explicit; go 1.12
 github.com/mattn/go-isatty
-# github.com/microcosm-cc/bluemonday v1.0.16
+# github.com/microcosm-cc/bluemonday v1.0.18
 ## explicit; go 1.16
 github.com/microcosm-cc/bluemonday
 github.com/microcosm-cc/bluemonday/css
@@ -226,9 +224,9 @@ github.com/modern-go/reflect2
 # github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 ## explicit
 github.com/nfnt/resize
-# github.com/oklog/ulid v1.3.1
+# github.com/oklog/ulid/v2 v2.0.2
 ## explicit
-github.com/oklog/ulid
+github.com/oklog/ulid/v2
 # github.com/pelletier/go-toml v1.9.4
 ## explicit; go 1.12
 github.com/pelletier/go-toml
@@ -255,8 +253,8 @@ github.com/spf13/afero/mem
 # github.com/spf13/cast v1.4.1
 ## explicit
 github.com/spf13/cast
-# github.com/spf13/cobra v1.2.1
-## explicit; go 1.14
+# github.com/spf13/cobra v1.3.0
+## explicit; go 1.15
 github.com/spf13/cobra
 # github.com/spf13/jwalterweatherman v1.1.0
 ## explicit
@@ -264,7 +262,7 @@ github.com/spf13/jwalterweatherman
 # github.com/spf13/pflag v1.0.5
 ## explicit; go 1.12
 github.com/spf13/pflag
-# github.com/spf13/viper v1.10.0
+# github.com/spf13/viper v1.10.1
 ## explicit; go 1.17
 github.com/spf13/viper
 github.com/spf13/viper/internal/encoding
@@ -473,11 +471,11 @@ github.com/superseriousbusiness/oauth2/v4/generates
 github.com/superseriousbusiness/oauth2/v4/manage
 github.com/superseriousbusiness/oauth2/v4/models
 github.com/superseriousbusiness/oauth2/v4/server
-# github.com/tdewolff/minify/v2 v2.9.22
+# github.com/tdewolff/minify/v2 v2.10.0
 ## explicit; go 1.13
 github.com/tdewolff/minify/v2
 github.com/tdewolff/minify/v2/html
-# github.com/tdewolff/parse/v2 v2.5.23
+# github.com/tdewolff/parse/v2 v2.5.27
 ## explicit; go 1.13
 github.com/tdewolff/parse/v2
 github.com/tdewolff/parse/v2/buffer
@@ -486,11 +484,11 @@ github.com/tdewolff/parse/v2/strconv
 # github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc
 ## explicit
 github.com/tmthrgd/go-hex
-# github.com/ugorji/go/codec v1.2.6
-## explicit; go 1.11
+# github.com/ugorji/go/codec v1.1.7
+## explicit
 github.com/ugorji/go/codec
-# github.com/uptrace/bun v1.0.19
-## explicit; go 1.16
+# github.com/uptrace/bun v1.0.22
+## explicit; go 1.17
 github.com/uptrace/bun
 github.com/uptrace/bun/dialect
 github.com/uptrace/bun/dialect/feature
@@ -501,11 +499,11 @@ github.com/uptrace/bun/internal/parser
 github.com/uptrace/bun/internal/tagparser
 github.com/uptrace/bun/migrate
 github.com/uptrace/bun/schema
-# github.com/uptrace/bun/dialect/pgdialect v1.0.19
-## explicit; go 1.16
+# github.com/uptrace/bun/dialect/pgdialect v1.0.22
+## explicit; go 1.17
 github.com/uptrace/bun/dialect/pgdialect
-# github.com/uptrace/bun/dialect/sqlitedialect v1.0.19
-## explicit; go 1.16
+# github.com/uptrace/bun/dialect/sqlitedialect v1.0.22
+## explicit; go 1.17
 github.com/uptrace/bun/dialect/sqlitedialect
 # github.com/vmihailenco/msgpack/v5 v5.3.5
 ## explicit; go 1.11
@@ -519,7 +517,7 @@ github.com/vmihailenco/tagparser/v2/internal/parser
 # github.com/wagslane/go-password-validator v0.3.0
 ## explicit; go 1.16
 github.com/wagslane/go-password-validator
-# golang.org/x/crypto v0.0.0-20211209193657-4570a0811e8b
+# golang.org/x/crypto v0.0.0-20220210151621-f4118a5b28e2
 ## explicit; go 1.17
 golang.org/x/crypto/acme
 golang.org/x/crypto/acme/autocert
@@ -531,7 +529,6 @@ golang.org/x/crypto/chacha20
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/curve25519/internal/field
 golang.org/x/crypto/ed25519
-golang.org/x/crypto/ed25519/internal/edwards25519
 golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/internal/subtle
 golang.org/x/crypto/pbkdf2
@@ -539,10 +536,10 @@ golang.org/x/crypto/ripemd160
 golang.org/x/crypto/sha3
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
-# golang.org/x/mod v0.5.1
+# golang.org/x/mod v0.5.0
 ## explicit; go 1.17
 golang.org/x/mod/semver
-# golang.org/x/net v0.0.0-20211209124913-491a49abca63
+# golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
 ## explicit; go 1.17
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -553,7 +550,7 @@ golang.org/x/net/idna
 ## explicit; go 1.11
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
-# golang.org/x/sys v0.0.0-20211210111614-af8b64212486
+# golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
 ## explicit; go 1.17
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
@@ -575,7 +572,7 @@ golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 golang.org/x/text/width
-# golang.org/x/tools v0.1.8
+# golang.org/x/tools v0.1.5
 ## explicit; go 1.17
 golang.org/x/tools/go/gcexportdata
 golang.org/x/tools/go/internal/gcimporter
@@ -587,7 +584,6 @@ golang.org/x/tools/internal/event/keys
 golang.org/x/tools/internal/event/label
 golang.org/x/tools/internal/gocommand
 golang.org/x/tools/internal/packagesinternal
-golang.org/x/tools/internal/typeparams
 golang.org/x/tools/internal/typesinternal
 # golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 ## explicit; go 1.11
@@ -641,7 +637,7 @@ gopkg.in/mcuadros/go-syslog.v2/format
 gopkg.in/mcuadros/go-syslog.v2/internal/syslogparser
 gopkg.in/mcuadros/go-syslog.v2/internal/syslogparser/rfc3164
 gopkg.in/mcuadros/go-syslog.v2/internal/syslogparser/rfc5424
-# gopkg.in/square/go-jose.v2 v2.6.0
+# gopkg.in/square/go-jose.v2 v2.5.1
 ## explicit
 gopkg.in/square/go-jose.v2
 gopkg.in/square/go-jose.v2/cipher
@@ -655,13 +651,13 @@ gopkg.in/yaml.v3
 # lukechampine.com/uint128 v1.1.1
 ## explicit; go 1.12
 lukechampine.com/uint128
-# modernc.org/cc/v3 v3.35.18
+# modernc.org/cc/v3 v3.35.22
 ## explicit; go 1.15
 modernc.org/cc/v3
-# modernc.org/ccgo/v3 v3.12.92
+# modernc.org/ccgo/v3 v3.15.13
 ## explicit; go 1.16
 modernc.org/ccgo/v3/lib
-# modernc.org/libc v1.11.101
+# modernc.org/libc v1.14.5
 ## explicit; go 1.16
 modernc.org/libc
 modernc.org/libc/errno
@@ -686,6 +682,7 @@ modernc.org/libc/termios
 modernc.org/libc/time
 modernc.org/libc/unistd
 modernc.org/libc/utime
+modernc.org/libc/uuid
 modernc.org/libc/uuid/uuid
 modernc.org/libc/wctype
 # modernc.org/mathutil v1.4.1
@@ -697,7 +694,7 @@ modernc.org/memory
 # modernc.org/opt v0.1.1
 ## explicit; go 1.13
 modernc.org/opt
-# modernc.org/sqlite v1.14.2
+# modernc.org/sqlite v1.14.6
 ## explicit; go 1.16
 modernc.org/sqlite
 modernc.org/sqlite/lib
