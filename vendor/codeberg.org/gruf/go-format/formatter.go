@@ -1,6 +1,7 @@
 package format
 
 import (
+	"reflect"
 	"strings"
 )
 
@@ -43,6 +44,7 @@ func (f Formatter) Append(buf *Buffer, v ...interface{}) {
 // - '{:?}' => format supplied arg verbosely, in place
 // - '{:k}' => format supplied arg as key, in place
 // - '{:v}' => format supplied arg as value, in place
+// - '{:T}' => format supplied arg's type, in place
 //
 // To escape either of '{}' simply append an additional brace e.g.
 // - '{{'     => '{'
@@ -151,33 +153,12 @@ func (f Formatter) Appendf(buf *Buffer, s string, a ...interface{}) {
 			return true
 		}
 
-		// ParseOp parses operands from the current string
-		// window, updating 'last' to 'idx'. The string window
-		// is ASSUMED to contain only valid operand ASCII. This
-		// returns success on parsing of operand logic
-		ParseOp = func() bool {
-			// Get current window
-			str := Str()
-			if len(str) < 1 {
-				return true
-			}
-
-			// (for now) only
-			// accept length = 1
-			if len(str) > 1 {
-				return false
-			}
-
-			switch str[0] {
-			case 'k':
-				fmt.flags |= isKeyBit
-			case 'v':
-				fmt.flags |= isValBit
-			case '?':
-				fmt.flags |= vboseBit
-			}
-
-			return true
+		// ValidOp checks that for current ending idx, that a valid
+		// operand was achieved -- only 0 and 1 are acceptable lens
+		ValidOp = func() bool {
+			diff := idx - last
+			last = idx
+			return (diff < 2)
 		}
 
 		// AppendArg will take either the directive-set, or
@@ -194,8 +175,13 @@ func (f Formatter) Appendf(buf *Buffer, s string, a ...interface{}) {
 			arg++
 
 			if carg < len(a) {
-				// Append formatted argument value
-				appendIfaceOrRValue(fmt, a[carg])
+				if fmt.flags&rtypeBit != 0 {
+					// Append the arg's type string
+					appendIface(fmt, reflect.TypeOf(a[carg]))
+				} else {
+					// Append formatted argument value
+					appendIfaceOrRValue(fmt, a[carg])
+				}
 			} else {
 				// No argument found for index
 				buf.AppendString(`!{MISSING_ARG}`)
@@ -309,11 +295,17 @@ func (f Formatter) Appendf(buf *Buffer, s string, a ...interface{}) {
 		// Preparing operands
 		case modeOp:
 			switch c {
-			case 'k', 'v', '?':
-				// TODO: set flags as received
+			case 'k':
+				fmt.flags |= isKeyBit
+			case 'v':
+				fmt.flags |= isValBit
+			case '?':
+				fmt.flags |= vboseBit
+			case 'T':
+				fmt.flags |= rtypeBit
 			case '}':
-				if !ParseOp() {
-					// Unable to parse operands
+				if !ValidOp() {
+					// Bad operands parsed
 					buf.AppendString(`!{BAD_OPERAND}`)
 				} else {
 					// Format arg

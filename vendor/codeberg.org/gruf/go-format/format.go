@@ -22,10 +22,11 @@ type format struct {
 
 const (
 	// flag bit constants.
-	isKeyBit = uint8(1) << 0
-	isValBit = uint8(1) << 1
-	vboseBit = uint8(1) << 2
-	panicBit = uint8(1) << 3
+	isKeyBit = uint8(1) << 0 // set to indicate key formatting
+	isValBit = uint8(1) << 1 // set to indicate value formatting
+	vboseBit = uint8(1) << 2 // set to indicate verbose formatting
+	panicBit = uint8(1) << 3 // set after panic to prevent recursion
+	rtypeBit = uint8(1) << 4 // set to indicate only print type within .Appendf()
 )
 
 // AtMaxDepth returns whether format is currently at max depth.
@@ -130,8 +131,8 @@ func appendNilType(fmt format, t string) {
 
 // appendByte Appends a single byte to buf.
 func appendByte(fmt format, b byte) {
-	if fmt.IsValue() || fmt.Verbose() {
-		fmt.buf.AppendString(`'` + string(b) + `'`)
+	if fmt.IsKey() || fmt.IsValue() || fmt.Verbose() {
+		fmt.buf.B = strconv.AppendQuoteRune(fmt.buf.B, rune(b))
 	} else {
 		fmt.buf.AppendByte(b)
 	}
@@ -274,11 +275,14 @@ func appendIface(fmt format, i interface{}) (ok bool) {
 
 	// Reflect types
 	case reflect.Type:
-		if isNil(i) /* safer nil check */ {
+		switch {
+		case isNil(i) /* safer nil check */ :
 			appendNilType(fmt, `reflect.Type`)
-		} else {
+		case fmt.Verbose():
 			appendType(fmt, `reflect.Type`)
 			fmt.buf.AppendString(`(` + i.String() + `)`)
+		default:
+			fmt.buf.AppendString(i.String())
 		}
 	case reflect.Value:
 		appendType(fmt, `reflect.Value`)
