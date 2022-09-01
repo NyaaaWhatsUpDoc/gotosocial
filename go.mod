@@ -1,18 +1,18 @@
 module github.com/superseriousbusiness/gotosocial
 
-go 1.18
+go 1.19
 
 require (
 	codeberg.org/gruf/go-atomics v1.1.0
 	codeberg.org/gruf/go-bytesize v0.2.1
 	codeberg.org/gruf/go-byteutil v1.0.2
-	codeberg.org/gruf/go-cache/v2 v2.1.2
+	codeberg.org/gruf/go-cache/v2 v2.1.4
 	codeberg.org/gruf/go-debug v1.2.0
 	codeberg.org/gruf/go-errors/v2 v2.0.2
-	codeberg.org/gruf/go-kv v1.3.2
-	codeberg.org/gruf/go-logger/v2 v2.0.6
+	codeberg.org/gruf/go-kv v1.5.2
+	codeberg.org/gruf/go-logger/v2 v2.2.1
 	codeberg.org/gruf/go-mutexes v1.1.2
-	codeberg.org/gruf/go-runners v1.2.2
+	codeberg.org/gruf/go-runners v1.3.0
 	codeberg.org/gruf/go-store v1.3.8
 	github.com/buckket/go-blurhash v1.1.0
 	github.com/coreos/go-oidc/v3 v3.1.0
@@ -41,8 +41,8 @@ require (
 	github.com/superseriousbusiness/activity v1.1.0-gts
 	github.com/superseriousbusiness/exif-terminator v0.4.0
 	github.com/superseriousbusiness/oauth2/v4 v4.3.2-SSB
-	github.com/ulule/limiter/v3 v3.10.0
 	github.com/tdewolff/minify/v2 v2.12.0
+	github.com/ulule/limiter/v3 v3.10.0
 	github.com/uptrace/bun v1.1.7
 	github.com/uptrace/bun/dialect/pgdialect v1.1.7
 	github.com/uptrace/bun/dialect/sqlitedialect v1.1.7
@@ -64,7 +64,7 @@ require (
 	codeberg.org/gruf/go-fastpath v1.0.3 // indirect
 	codeberg.org/gruf/go-hashenc v1.0.2 // indirect
 	codeberg.org/gruf/go-pools v1.1.0 // indirect
-	codeberg.org/gruf/go-sched v1.0.4 // indirect
+	codeberg.org/gruf/go-sched v1.1.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dsoprea/go-exif/v3 v3.0.0-20210625224831-a6301f85c82b // indirect

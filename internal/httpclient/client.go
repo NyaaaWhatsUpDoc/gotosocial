@@ -26,6 +26,8 @@ import (
 	"net/netip"
 	"runtime"
 	"time"
+
+	"codeberg.org/gruf/go-cache/v2"
 )
 
 // ErrInvalidRequest is returned if a given HTTP request is invalid and cannot be performed.
@@ -42,7 +44,7 @@ var ErrBodyTooLarge = errors.New("body size too large")
 // configuration values passed to initialized http.Transport{}
 // and http.Client{}, along with httpclient.Client{} specific.
 type Config struct {
-	// MaxOpenConns limits the max number of concurrent open connections.
+	// MaxOpenConns limits the max number of concurrent open connections per host.
 	MaxOpenConns int
 
 	// MaxIdleConns: see http.Transport{}.MaxIdleConns.
@@ -71,17 +73,18 @@ type Config struct {
 }
 
 // Client wraps an underlying http.Client{} to provide the following:
-// - setting a maximum received request body size, returning error on
-//   large content lengths, and using a limited reader in all other
-//   cases to protect against forged / unknown content-lengths
-// - protection from server side request forgery (SSRF) by only dialing
-//   out to known public IP prefixes, configurable with allows/blocks
-// - limit number of concurrent requests, else blocking until a slot
-//   is available (context channels still respected)
+//   - setting a maximum received request body size, returning error on
+//     large content lengths, and using a limited reader in all other
+//     cases to protect against forged / unknown content-lengths
+//   - protection from server side request forgery (SSRF) by only dialing
+//     out to known public IP prefixes, configurable with allows/blocks
+//   - limit number of concurrent requests, else blocking until a slot
+//     is available (context channels still respected)
 type Client struct {
 	client http.Client
-	rc     *requestQueue
+	queue  cache.TTLCache[string, chan struct{}]
 	bmax   int64
+	cmax   int
 }
 
 // New returns a new instance of Client initialized using configuration.
@@ -110,6 +113,11 @@ func New(cfg Config) *Client {
 		cfg.MaxBodySize = 40 * 1024 * 1024
 	}
 
+	if cfg.Timeout <= 0 {
+		// By default set to reasonable 30s
+		cfg.Timeout = 30 * time.Second
+	}
+
 	// Protect dialer with IP range sanitizer
 	d.Control = (&sanitizer{
 		allow: cfg.AllowRanges,
@@ -118,10 +126,17 @@ func New(cfg Config) *Client {
 
 	// Prepare client fields
 	c.bmax = cfg.MaxBodySize
-	c.rc = &requestQueue{
-		maxOpenConns: cfg.MaxOpenConns,
-	}
+	c.cmax = cfg.MaxOpenConns
 	c.client.Timeout = cfg.Timeout
+	c.queue.Init()
+
+	// Start the queue cache
+	// (we use cfg.Timeout as a base metric as
+	//  it would be an issue for a per-host-queue
+	//  to be swept from cache while still in use,
+	//  i.e. after an exceptionally long open conn).
+	c.queue.SetTTL(100*cfg.Timeout, true)
+	c.queue.Start(10 * cfg.Timeout)
 
 	// Set underlying HTTP client roundtripper
 	c.client.Transport = &http.Transport{
@@ -145,8 +160,8 @@ func New(cfg Config) *Client {
 // as the standard http.Client{}.Do() implementation except that response body will
 // be wrapped by an io.LimitReader() to limit response body sizes.
 func (c *Client) Do(req *http.Request) (*http.Response, error) {
-	// request a spot in the wait queue...
-	wait, release := c.rc.getWaitSpot(req.Host, req.Method)
+	// Get a per-host request queue
+	queue := c.getQueue(req.Host)
 
 	// ... and wait our turn
 	select {
@@ -154,7 +169,7 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 		// the request was canceled before we
 		// got to our turn: no need to release
 		return nil, req.Context().Err()
-	case wait <- struct{}{}:
+	case queue <- struct{}{}:
 		// it's our turn!
 
 		// NOTE:
@@ -167,7 +182,7 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 		// that connections may not be closed until response body is closed.
 		// The current implementation will reduce the viability of denial of
 		// service attacks, but if there are future issues heed this advice :]
-		defer release()
+		defer func() { <-queue }()
 	}
 
 	// Firstly, ensure this is a valid request
@@ -207,4 +222,16 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 	}{rbody, cbody}
 
 	return rsp, nil
+}
+
+// getQueue fetches a queue (to limit requests) for given hostname.
+func (c *Client) getQueue(host string) chan struct{} {
+	c.queue.Lock()
+	queue, ok := c.queue.GetUnsafe(host)
+	if !ok {
+		queue = make(chan struct{}, c.cmax)
+		c.queue.SetUnsafe(host, queue)
+	}
+	c.queue.Unlock()
+	return queue
 }
