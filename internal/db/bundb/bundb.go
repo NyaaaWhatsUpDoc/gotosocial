@@ -45,8 +45,6 @@ import (
 	"github.com/uptrace/bun/dialect/pgdialect"
 	"github.com/uptrace/bun/dialect/sqlitedialect"
 	"github.com/uptrace/bun/migrate"
-
-	"modernc.org/sqlite"
 )
 
 const (
@@ -101,18 +99,15 @@ func doMigration(ctx context.Context, db *bun.DB) error {
 	migrator := migrate.NewMigrator(db, migrations.Migrations)
 
 	if err := migrator.Init(ctx); err != nil {
-		return err
+		return fmt.Errorf("error initializing migrator: %w", err)
 	}
 
 	group, err := migrator.Migrate(ctx)
-	if err != nil {
-		if err.Error() == "migrate: there are no any migrations" {
-			return nil
-		}
-		return err
+	if err != nil && err.Error() != "migrate: there are no migrations" {
+		return fmt.Errorf("error running migrations: %w", err)
 	}
 
-	if group.ID == 0 {
+	if group == nil || group.ID == 0 {
 		log.Info("there are no new migrations to run")
 		return nil
 	}
@@ -247,11 +242,8 @@ func sqliteConn(ctx context.Context) (*DBConn, error) {
 	}
 
 	// Open new DB instance
-	sqldb, err := sql.Open("sqlite", dbAddress)
+	sqldb, err := sql.Open("sqlite3", dbAddress)
 	if err != nil {
-		if errWithCode, ok := err.(*sqlite.Error); ok {
-			err = errors.New(sqlite.ErrorCodeString[errWithCode.Code()])
-		}
 		return nil, fmt.Errorf("could not open sqlite db: %s", err)
 	}
 
@@ -268,9 +260,6 @@ func sqliteConn(ctx context.Context) (*DBConn, error) {
 
 	// ping to check the db is there and listening
 	if err := conn.PingContext(ctx); err != nil {
-		if errWithCode, ok := err.(*sqlite.Error); ok {
-			err = errors.New(sqlite.ErrorCodeString[errWithCode.Code()])
-		}
 		return nil, fmt.Errorf("sqlite ping: %s", err)
 	}
 

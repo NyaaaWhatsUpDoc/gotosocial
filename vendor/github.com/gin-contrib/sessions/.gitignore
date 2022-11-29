@@ -1,5 +1,3 @@
 coverage.out
 vendor/*
 !/vendor/vendor.json
-/gorm/test.db
-.idea

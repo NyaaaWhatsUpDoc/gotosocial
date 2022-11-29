@@ -2,9 +2,8 @@ package bundb
 
 import (
 	"github.com/jackc/pgconn"
+	"github.com/mattn/go-sqlite3"
 	"github.com/superseriousbusiness/gotosocial/internal/db"
-	"modernc.org/sqlite"
-	sqlite3 "modernc.org/sqlite/lib"
 )
 
 // processPostgresError processes an error, replacing any postgres specific errors with our own error type
@@ -28,16 +27,17 @@ func processPostgresError(err error) db.Error {
 // processSQLiteError processes an error, replacing any sqlite specific errors with our own error type
 func processSQLiteError(err error) db.Error {
 	// Attempt to cast as sqlite
-	sqliteErr, ok := err.(*sqlite.Error)
+	sqliteErr, ok := err.(*sqlite3.Error)
 	if !ok {
 		return err
 	}
 
-	// Handle supplied error code:
-	switch sqliteErr.Code() {
-	case sqlite3.SQLITE_CONSTRAINT_UNIQUE, sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY:
+	// Swap-out sqlite errors for our own.
+	if sqliteErr.Code == sqlite3.ErrConstraint &&
+		(sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique ||
+			sqliteErr.ExtendedCode == sqlite3.ErrConstraintPrimaryKey) {
 		return db.ErrAlreadyExists
-	default:
-		return err
 	}
+
+	return err
 }
