@@ -401,15 +401,16 @@ func deriveBunDBPGOptions() (*pgx.ConnConfig, error) {
 // sqlitePragmas sets desired sqlite pragmas based on configured values, and
 // logs the results of the pragma queries. Errors if something goes wrong.
 func sqlitePragmas(ctx context.Context, conn *DBConn) error {
-	var pragmas [][]string
+	var pragmas [][2]string
+
 	if mode := config.GetDbSqliteJournalMode(); mode != "" {
 		// Set the user provided SQLite journal mode
-		pragmas = append(pragmas, []string{"journal_mode", mode})
+		pragmas = append(pragmas, [2]string{"journal_mode", mode})
 	}
 
 	if mode := config.GetDbSqliteSynchronous(); mode != "" {
 		// Set the user provided SQLite synchronous mode
-		pragmas = append(pragmas, []string{"synchronous", mode})
+		pragmas = append(pragmas, [2]string{"synchronous", mode})
 	}
 
 	if size := config.GetDbSqliteCacheSize(); size > 0 {
@@ -418,28 +419,25 @@ func sqlitePragmas(ctx context.Context, conn *DBConn) error {
 		// that we're giving kibibytes rather than num pages.
 		// https://www.sqlite.org/pragma.html#pragma_cache_size
 		s := "-" + strconv.FormatUint(uint64(size/bytesize.KiB), 10)
-		pragmas = append(pragmas, []string{"cache_size", s})
+		pragmas = append(pragmas, [2]string{"cache_size", s})
 	}
 
 	if timeout := config.GetDbSqliteBusyTimeout(); timeout > 0 {
+		// Set the user provided SQLite busy timeout (in milliseconds).
+		// This is especially required when journal_mode is set to WAL.
 		t := strconv.FormatInt(timeout.Milliseconds(), 10)
-		pragmas = append(pragmas, []string{"busy_timeout", t})
+		pragmas = append(pragmas, [2]string{"busy_timeout", t})
 	}
 
-	for _, p := range pragmas {
-		pk := p[0]
-		pv := p[1]
+	for _, pragma := range pragmas {
+		// Split into key-value pair.
+		k := bun.Ident(pragma[0])
+		v := bun.Safe(pragma[1])
 
-		if _, err := conn.DB.ExecContext(ctx, "PRAGMA ?=?", bun.Ident(pk), bun.Safe(pv)); err != nil {
-			return fmt.Errorf("error executing sqlite pragma %s: %w", pk, err)
+		log.Info("setting sqlite pragma %s = %s", k, v)
+		if _, err := conn.DB.ExecContext(ctx, "PRAGMA ?=?", k, v); err != nil {
+			return fmt.Errorf("error executing sqlite pragma %s: %w", k, err)
 		}
-
-		var res string
-		if err := conn.DB.NewRaw("PRAGMA ?", bun.Ident(pk)).Scan(ctx, &res); err != nil {
-			return fmt.Errorf("error scanning sqlite pragma %s: %w", pv, err)
-		}
-
-		log.Infof("sqlite pragma %s set to %s", pk, res)
 	}
 
 	return nil
