@@ -46,7 +46,7 @@ func (p *Processor) authenticate(ctx context.Context, requestedUsername string) 
 		return
 	}
 
-	blocked, err := p.state.DB.IsBlocked(ctx, requestedAccount.ID, requestingAccount.ID, true)
+	blocked, err := p.state.DB.IsMutualBlocked(ctx, requestedAccount.ID, requestingAccount.ID)
 	if err != nil {
 		errWithCode = gtserror.NewErrorInternalError(err)
 		return

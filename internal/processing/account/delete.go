@@ -96,12 +96,12 @@ func (p *Processor) Delete(ctx context.Context, account *gtsmodel.Account, origi
 	// TODO: federate these if necessary
 	l.Trace("deleting account follow requests")
 	// first delete any follow requests that this account created
-	if err := p.state.DB.DeleteWhere(ctx, []db.Where{{Key: "account_id", Value: account.ID}}, &[]*gtsmodel.FollowRequest{}); err != nil {
+	if err := p.state.DB.DeleteFollowRequestsByOriginAccountID(ctx, account.ID); err != nil {
 		l.Errorf("error deleting follow requests created by account: %s", err)
 	}
 
 	// now delete any follow requests that target this account
-	if err := p.state.DB.DeleteWhere(ctx, []db.Where{{Key: "target_account_id", Value: account.ID}}, &[]*gtsmodel.FollowRequest{}); err != nil {
+	if err := p.state.DB.DeleteFollowRequestsByTargetAccountID(ctx, account.ID); err != nil {
 		l.Errorf("error deleting follow requests targeting account: %s", err)
 	}
 
@@ -109,12 +109,12 @@ func (p *Processor) Delete(ctx context.Context, account *gtsmodel.Account, origi
 	// TODO: federate these if necessary
 	l.Trace("deleting account follows")
 	// first delete any follows that this account created
-	if err := p.state.DB.DeleteWhere(ctx, []db.Where{{Key: "account_id", Value: account.ID}}, &[]*gtsmodel.Follow{}); err != nil {
+	if err := p.state.DB.DeleteFollowsByOriginAccountID(ctx, account.ID); err != nil {
 		l.Errorf("error deleting follows created by account: %s", err)
 	}
 
 	// now delete any follows that target this account
-	if err := p.state.DB.DeleteWhere(ctx, []db.Where{{Key: "target_account_id", Value: account.ID}}, &[]*gtsmodel.Follow{}); err != nil {
+	if err := p.state.DB.DeleteFollowsByTargetAccountID(ctx, account.ID); err != nil {
 		l.Errorf("error deleting follows targeting account: %s", err)
 	}
 

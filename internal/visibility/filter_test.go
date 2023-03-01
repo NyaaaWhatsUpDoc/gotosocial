@@ -30,7 +30,8 @@ import (
 type FilterStandardTestSuite struct {
 	// standard suite interfaces
 	suite.Suite
-	db db.DB
+	db    db.DB
+	state state.State
 
 	// standard suite models
 	testTokens       map[string]*gtsmodel.Token
@@ -61,13 +62,13 @@ func (suite *FilterStandardTestSuite) SetupSuite() {
 }
 
 func (suite *FilterStandardTestSuite) SetupTest() {
-	var state state.State
-	state.Caches.Init()
+	suite.state.Caches.Init()
 
 	testrig.InitTestConfig()
 	testrig.InitTestLog()
 
-	suite.db = testrig.NewTestDB(&state)
+	suite.db = testrig.NewTestDB(&suite.state)
+	suite.state.DB = suite.db
 	suite.filter = visibility.NewFilter(suite.db)
 
 	testrig.StandardDBSetup(suite.db, nil)

@@ -186,7 +186,7 @@ func (p *Processor) FavedBy(ctx context.Context, requestingAccount *gtsmodel.Acc
 	// filter the list so the user doesn't see accounts they blocked or which blocked them
 	filteredAccounts := []*gtsmodel.Account{}
 	for _, fave := range statusFaves {
-		blocked, err := p.state.DB.IsBlocked(ctx, requestingAccount.ID, fave.AccountID, true)
+		blocked, err := p.state.DB.IsMutualBlocked(ctx, requestingAccount.ID, fave.AccountID)
 		if err != nil {
 			return nil, gtserror.NewErrorInternalError(fmt.Errorf("error checking blocks: %s", err))
 		}

@@ -322,7 +322,7 @@ func (p *Processor) timelineStatus(ctx context.Context, status *gtsmodel.Status)
 	}
 
 	// get local followers of the account that posted the status
-	follows, err := p.state.DB.GetAccountFollowedBy(ctx, status.AccountID, true)
+	follows, err := p.state.DB.GetAccountLocalFollowedBys(ctx, status.AccountID)
 	if err != nil {
 		return fmt.Errorf("timelineStatus: error getting followers for account id %s: %s", status.AccountID, err)
 	}

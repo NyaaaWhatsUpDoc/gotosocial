@@ -31,14 +31,14 @@ import (
 
 // FollowersGet fetches a list of the target account's followers.
 func (p *Processor) FollowersGet(ctx context.Context, requestingAccount *gtsmodel.Account, targetAccountID string) ([]apimodel.Account, gtserror.WithCode) {
-	if blocked, err := p.state.DB.IsBlocked(ctx, requestingAccount.ID, targetAccountID, true); err != nil {
+	if blocked, err := p.state.DB.IsMutualBlocked(ctx, requestingAccount.ID, targetAccountID); err != nil {
 		return nil, gtserror.NewErrorInternalError(err)
 	} else if blocked {
 		return nil, gtserror.NewErrorNotFound(fmt.Errorf("block exists between accounts"))
 	}
 
 	accounts := []apimodel.Account{}
-	follows, err := p.state.DB.GetAccountFollowedBy(ctx, targetAccountID, false)
+	follows, err := p.state.DB.GetAccountFollowedBys(ctx, targetAccountID)
 	if err != nil {
 		if err == db.ErrNoEntries {
 			return accounts, nil
@@ -47,7 +47,7 @@ func (p *Processor) FollowersGet(ctx context.Context, requestingAccount *gtsmode
 	}
 
 	for _, f := range follows {
-		blocked, err := p.state.DB.IsBlocked(ctx, requestingAccount.ID, f.AccountID, true)
+		blocked, err := p.state.DB.IsMutualBlocked(ctx, requestingAccount.ID, f.AccountID)
 		if err != nil {
 			return nil, gtserror.NewErrorInternalError(err)
 		}
@@ -77,7 +77,7 @@ func (p *Processor) FollowersGet(ctx context.Context, requestingAccount *gtsmode
 
 // FollowingGet fetches a list of the accounts that target account is following.
 func (p *Processor) FollowingGet(ctx context.Context, requestingAccount *gtsmodel.Account, targetAccountID string) ([]apimodel.Account, gtserror.WithCode) {
-	if blocked, err := p.state.DB.IsBlocked(ctx, requestingAccount.ID, targetAccountID, true); err != nil {
+	if blocked, err := p.state.DB.IsMutualBlocked(ctx, requestingAccount.ID, targetAccountID); err != nil {
 		return nil, gtserror.NewErrorInternalError(err)
 	} else if blocked {
 		return nil, gtserror.NewErrorNotFound(fmt.Errorf("block exists between accounts"))
@@ -93,7 +93,7 @@ func (p *Processor) FollowingGet(ctx context.Context, requestingAccount *gtsmode
 	}
 
 	for _, f := range follows {
-		blocked, err := p.state.DB.IsBlocked(ctx, requestingAccount.ID, f.AccountID, true)
+		blocked, err := p.state.DB.IsMutualBlocked(ctx, requestingAccount.ID, f.AccountID)
 		if err != nil {
 			return nil, gtserror.NewErrorInternalError(err)
 		}

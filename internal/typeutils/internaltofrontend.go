@@ -87,13 +87,13 @@ func (c *converter) AccountToAPIAccountSensitive(ctx context.Context, a *gtsmode
 
 func (c *converter) AccountToAPIAccountPublic(ctx context.Context, a *gtsmodel.Account) (*apimodel.Account, error) {
 	// count followers
-	followersCount, err := c.db.CountAccountFollowedBy(ctx, a.ID, false)
+	followersCount, err := c.db.CountAccountFollowedBys(ctx, a.ID)
 	if err != nil {
 		return nil, fmt.Errorf("error counting followers: %s", err)
 	}
 
 	// count following
-	followingCount, err := c.db.CountAccountFollows(ctx, a.ID, false)
+	followingCount, err := c.db.CountAccountFollows(ctx, a.ID)
 	if err != nil {
 		return nil, fmt.Errorf("error counting following: %s", err)
 	}

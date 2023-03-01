@@ -20,6 +20,7 @@ package processing
 
 import (
 	"context"
+	"errors"
 
 	"github.com/superseriousbusiness/gotosocial/internal/ap"
 	apimodel "github.com/superseriousbusiness/gotosocial/internal/api/model"
@@ -100,44 +101,39 @@ func (p *Processor) FollowRequestAccept(ctx context.Context, auth *oauth.Auth, a
 }
 
 func (p *Processor) FollowRequestReject(ctx context.Context, auth *oauth.Auth, accountID string) (*apimodel.Relationship, gtserror.WithCode) {
-	followRequest, err := p.state.DB.RejectFollowRequest(ctx, accountID, auth.Account.ID)
+	followReq, err := p.state.DB.GetFollowRequest(ctx, accountID, auth.Account.ID)
 	if err != nil {
+		if !errors.Is(err, db.ErrNoEntries) {
+			return nil, gtserror.NewErrorInternalError(err)
+		}
 		return nil, gtserror.NewErrorNotFound(err)
 	}
 
-	if followRequest.Account == nil {
-		a, err := p.state.DB.GetAccountByID(ctx, followRequest.AccountID)
-		if err != nil {
+	err = p.state.DB.RejectFollowRequest(ctx, accountID, auth.Account.ID)
+	if err != nil {
+		if !errors.Is(err, db.ErrNoEntries) {
 			return nil, gtserror.NewErrorInternalError(err)
 		}
-		followRequest.Account = a
-	}
-
-	if followRequest.TargetAccount == nil {
-		a, err := p.state.DB.GetAccountByID(ctx, followRequest.TargetAccountID)
-		if err != nil {
-			return nil, gtserror.NewErrorInternalError(err)
-		}
-		followRequest.TargetAccount = a
+		return nil, gtserror.NewErrorNotFound(err)
 	}
 
 	p.state.Workers.EnqueueClientAPI(ctx, messages.FromClientAPI{
 		APObjectType:   ap.ActivityFollow,
 		APActivityType: ap.ActivityReject,
-		GTSModel:       followRequest,
-		OriginAccount:  followRequest.Account,
-		TargetAccount:  followRequest.TargetAccount,
+		GTSModel:       followReq,
+		OriginAccount:  followReq.Account,
+		TargetAccount:  followReq.TargetAccount,
 	})
 
-	gtsR, err := p.state.DB.GetRelationship(ctx, auth.Account.ID, accountID)
+	gtsRel, err := p.state.DB.GetRelationship(ctx, auth.Account.ID, accountID)
 	if err != nil {
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
-	r, err := p.tc.RelationshipToAPIRelationship(ctx, gtsR)
+	rel, err := p.tc.RelationshipToAPIRelationship(ctx, gtsRel)
 	if err != nil {
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
-	return r, nil
+	return rel, nil
 }

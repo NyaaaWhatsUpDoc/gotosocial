@@ -42,7 +42,7 @@ func (p *Processor) BlockCreate(ctx context.Context, requestingAccount *gtsmodel
 	}
 
 	// if requestingAccount already blocks target account, we don't need to do anything
-	if blocked, err := p.state.DB.IsBlocked(ctx, requestingAccount.ID, targetAccountID, false); err != nil {
+	if blocked, err := p.state.DB.IsBlocked(ctx, requestingAccount.ID, targetAccountID); err != nil {
 		return nil, gtserror.NewErrorInternalError(fmt.Errorf("BlockCreate: error checking existence of block: %s", err))
 	} else if blocked {
 		return p.RelationshipGet(ctx, requestingAccount, targetAccountID)

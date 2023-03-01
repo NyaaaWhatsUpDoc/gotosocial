@@ -35,7 +35,7 @@ import (
 // FollowCreate handles a follow request to an account, either remote or local.
 func (p *Processor) FollowCreate(ctx context.Context, requestingAccount *gtsmodel.Account, form *apimodel.AccountFollowRequest) (*apimodel.Relationship, gtserror.WithCode) {
 	// if there's a block between the accounts we shouldn't create the request ofc
-	if blocked, err := p.state.DB.IsBlocked(ctx, requestingAccount.ID, form.ID, true); err != nil {
+	if blocked, err := p.state.DB.IsMutualBlocked(ctx, requestingAccount.ID, form.ID); err != nil {
 		return nil, gtserror.NewErrorInternalError(err)
 	} else if blocked {
 		return nil, gtserror.NewErrorNotFound(fmt.Errorf("block exists between accounts"))
@@ -51,7 +51,7 @@ func (p *Processor) FollowCreate(ctx context.Context, requestingAccount *gtsmode
 	}
 
 	// check if a follow exists already
-	if follows, err := p.state.DB.IsFollowing(ctx, requestingAccount, targetAcct); err != nil {
+	if follows, err := p.state.DB.IsFollowing(ctx, requestingAccount.ID, targetAcct.ID); err != nil {
 		return nil, gtserror.NewErrorInternalError(fmt.Errorf("accountfollowcreate: error checking follow in db: %s", err))
 	} else if follows {
 		// already follows so just return the relationship
@@ -59,7 +59,7 @@ func (p *Processor) FollowCreate(ctx context.Context, requestingAccount *gtsmode
 	}
 
 	// check if a follow request exists already
-	if followRequested, err := p.state.DB.IsFollowRequested(ctx, requestingAccount, targetAcct); err != nil {
+	if followRequested, err := p.state.DB.IsFollowRequested(ctx, requestingAccount.ID, targetAcct.ID); err != nil {
 		return nil, gtserror.NewErrorInternalError(fmt.Errorf("accountfollowcreate: error checking follow request in db: %s", err))
 	} else if followRequested {
 		// already follow requested so just return the relationship
@@ -124,7 +124,7 @@ func (p *Processor) FollowCreate(ctx context.Context, requestingAccount *gtsmode
 // FollowRemove handles the removal of a follow/follow request to an account, either remote or local.
 func (p *Processor) FollowRemove(ctx context.Context, requestingAccount *gtsmodel.Account, targetAccountID string) (*apimodel.Relationship, gtserror.WithCode) {
 	// if there's a block between the accounts we shouldn't do anything
-	blocked, err := p.state.DB.IsBlocked(ctx, requestingAccount.ID, targetAccountID, true)
+	blocked, err := p.state.DB.IsMutualBlocked(ctx, requestingAccount.ID, targetAccountID)
 	if err != nil {
 		return nil, gtserror.NewErrorInternalError(err)
 	}

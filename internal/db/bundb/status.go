@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/superseriousbusiness/gotosocial/internal/db"
+	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
@@ -61,7 +62,9 @@ func (s *statusDB) GetStatusByID(ctx context.Context, id string) (*gtsmodel.Stat
 		ctx,
 		"ID",
 		func(status *gtsmodel.Status) error {
-			return s.newStatusQ(status).Where("? = ?", bun.Ident("status.id"), id).Scan(ctx)
+			return s.newStatusQ(status).
+				Where("? = ?", bun.Ident("status.id"), id).
+				Scan(ctx)
 		},
 		id,
 	)
@@ -120,7 +123,8 @@ func (s *statusDB) getStatus(ctx context.Context, lookup string, dbQuery func(*g
 		if status.InReplyToID != "" {
 			// Also load in-reply-to status
 			status.InReplyTo = new(gtsmodel.Status)
-			err := s.conn.NewSelect().Model(status.InReplyTo).
+			err := s.conn.NewSelect().
+				Model(status.InReplyTo).
 				Where("? = ?", bun.Ident("status.id"), status.InReplyToID).
 				Scan(ctx)
 			if err != nil {
@@ -131,7 +135,8 @@ func (s *statusDB) getStatus(ctx context.Context, lookup string, dbQuery func(*g
 		if status.BoostOfID != "" {
 			// Also load original boosted status
 			status.BoostOf = new(gtsmodel.Status)
-			err := s.conn.NewSelect().Model(status.BoostOf).
+			err := s.conn.NewSelect().
+				Model(status.BoostOf).
 				Where("? = ?", bun.Ident("status.id"), status.BoostOfID).
 				Scan(ctx)
 			if err != nil {
@@ -146,23 +151,34 @@ func (s *statusDB) getStatus(ctx context.Context, lookup string, dbQuery func(*g
 		return nil, err
 	}
 
+	if gtscontext.Barebones(ctx) {
+		// Only a barebones model was requested.
+		return status, nil
+	}
+
 	// Set the status author account
 	status.Account, err = s.state.DB.GetAccountByID(ctx, status.AccountID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting status account: %w", err)
 	}
 
-	if id := status.BoostOfAccountID; id != "" {
+	if status.BoostOfAccountID != "" {
 		// Set boost of status' author account
-		status.BoostOfAccount, err = s.state.DB.GetAccountByID(ctx, id)
+		status.BoostOfAccount, err = s.state.DB.GetAccountByID(
+			gtscontext.SetBarebones(ctx),
+			status.BoostOfAccountID,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("error getting boosted status account: %w", err)
 		}
 	}
 
-	if id := status.InReplyToAccountID; id != "" {
+	if status.InReplyToAccountID != "" {
 		// Set in-reply-to status' author account
-		status.InReplyToAccount, err = s.state.DB.GetAccountByID(ctx, id)
+		status.InReplyToAccount, err = s.state.DB.GetAccountByID(
+			gtscontext.SetBarebones(ctx),
+			status.InReplyToAccountID,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("error getting in reply to status account: %w", err)
 		}
@@ -170,7 +186,10 @@ func (s *statusDB) getStatus(ctx context.Context, lookup string, dbQuery func(*g
 
 	if len(status.EmojiIDs) > 0 {
 		// Fetch status emojis
-		status.Emojis, err = s.state.DB.GetEmojisByIDs(ctx, status.EmojiIDs)
+		status.Emojis, err = s.state.DB.GetEmojisByIDs(
+			gtscontext.SetBarebones(ctx),
+			status.EmojiIDs,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("error getting status emojis: %w", err)
 		}
@@ -178,7 +197,10 @@ func (s *statusDB) getStatus(ctx context.Context, lookup string, dbQuery func(*g
 
 	if len(status.MentionIDs) > 0 {
 		// Fetch status mentions
-		status.Mentions, err = s.state.DB.GetMentions(ctx, status.MentionIDs)
+		status.Mentions, err = s.state.DB.GetMentions(
+			gtscontext.SetBarebones(ctx),
+			status.MentionIDs,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("error getting status mentions: %w", err)
 		}

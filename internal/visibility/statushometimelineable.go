@@ -74,7 +74,7 @@ func (f *filter) StatusHometimelineable(ctx context.Context, targetStatus *gtsmo
 		}
 		targetStatus.Account = tsa
 	}
-	following, err := f.db.IsFollowing(ctx, timelineOwnerAccount, targetStatus.Account)
+	following, err := f.db.IsFollowing(ctx, timelineOwnerAccount.ID, targetStatus.Account.ID)
 	if err != nil {
 		return false, fmt.Errorf("StatusHometimelineable: error checking if %s follows %s: %s", timelineOwnerAccount.ID, targetStatus.AccountID, err)
 	}

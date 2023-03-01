@@ -20,8 +20,10 @@ package bundb
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/superseriousbusiness/gotosocial/internal/db"
+	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
@@ -33,20 +35,13 @@ type mentionDB struct {
 	state *state.State
 }
 
-func (m *mentionDB) newMentionQ(i interface{}) *bun.SelectQuery {
-	return m.conn.
-		NewSelect().
-		Model(i).
-		Relation("Status").
-		Relation("OriginAccount").
-		Relation("TargetAccount")
-}
-
 func (m *mentionDB) GetMention(ctx context.Context, id string) (*gtsmodel.Mention, db.Error) {
-	return m.state.Caches.GTS.Mention().Load("ID", func() (*gtsmodel.Mention, error) {
+	// Fetch mention from database cache with loader callback
+	mention, err := m.state.Caches.GTS.Mention().Load("ID", func() (*gtsmodel.Mention, error) {
 		var mention gtsmodel.Mention
 
-		q := m.newMentionQ(&mention).
+		q := m.conn.NewSelect().
+			Model(&mention).
 			Where("? = ?", bun.Ident("mention.id"), id)
 
 		if err := q.Scan(ctx); err != nil {
@@ -55,6 +50,43 @@ func (m *mentionDB) GetMention(ctx context.Context, id string) (*gtsmodel.Mentio
 
 		return &mention, nil
 	}, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if gtscontext.Barebones(ctx) {
+		// Only a barebones model was requested.
+		return mention, nil
+	}
+
+	// Set the actual mention status
+	mention.Status, err = m.state.DB.GetStatusByID(
+		gtscontext.SetBarebones(ctx),
+		mention.StatusID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting mention status: %w", err)
+	}
+
+	// Set mention author's account
+	mention.OriginAccount, err = m.state.DB.GetAccountByID(
+		gtscontext.SetBarebones(ctx),
+		mention.OriginAccountID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting mention origin account: %w", err)
+	}
+
+	// Set mention target's account
+	mention.TargetAccount, err = m.state.DB.GetAccountByID(
+		gtscontext.SetBarebones(ctx),
+		mention.TargetAccountID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting mention target account: %w", err)
+	}
+
+	return mention, nil
 }
 
 func (m *mentionDB) GetMentions(ctx context.Context, ids []string) ([]*gtsmodel.Mention, db.Error) {

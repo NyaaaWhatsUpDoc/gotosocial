@@ -19,6 +19,8 @@
 package cache
 
 import (
+	"time"
+
 	"codeberg.org/gruf/go-cache/v3/result"
 	"github.com/superseriousbusiness/gotosocial/internal/cache/domain"
 	"github.com/superseriousbusiness/gotosocial/internal/config"
@@ -50,6 +52,12 @@ type GTSCaches interface {
 
 	// EmojiCategory provides access to the gtsmodel EmojiCategory database cache.
 	EmojiCategory() *result.Cache[*gtsmodel.EmojiCategory]
+
+	// Follow provides access to the gtsmodel Follow database cache.
+	Follow() *result.Cache[*gtsmodel.Follow]
+
+	// FollowRequest provides access to the gtsmodel FollowRequest database cache.
+	FollowRequest() *result.Cache[*gtsmodel.FollowRequest]
 
 	// Mention provides access to the gtsmodel Mention database cache.
 	Mention() *result.Cache[*gtsmodel.Mention]
@@ -84,6 +92,8 @@ type gtsCaches struct {
 	domainBlock   *domain.BlockCache
 	emoji         *result.Cache[*gtsmodel.Emoji]
 	emojiCategory *result.Cache[*gtsmodel.EmojiCategory]
+	follow        *result.Cache[*gtsmodel.Follow]
+	followRequest *result.Cache[*gtsmodel.FollowRequest]
 	media         *result.Cache[*gtsmodel.MediaAttachment]
 	mention       *result.Cache[*gtsmodel.Mention]
 	notification  *result.Cache[*gtsmodel.Notification]
@@ -99,6 +109,8 @@ func (c *gtsCaches) Init() {
 	c.initDomainBlock()
 	c.initEmoji()
 	c.initEmojiCategory()
+	c.initFollow()
+	c.initFollowRequest()
 	c.initMedia()
 	c.initMention()
 	c.initNotification()
@@ -123,6 +135,12 @@ func (c *gtsCaches) Start() {
 	})
 	tryUntil("starting gtsmodel.EmojiCategory cache", 5, func() bool {
 		return c.emojiCategory.Start(config.GetCacheGTSEmojiCategorySweepFreq())
+	})
+	tryUntil("starting gtsmodel.Follow cache", 5, func() bool {
+		return c.follow.Start(time.Second * 30)
+	})
+	tryUntil("starting gtsmodel.FollowRequest cache", 5, func() bool {
+		return c.followRequest.Start(time.Second * 30)
 	})
 	tryUntil("starting gtsmodel.MediaAttachment cache", 5, func() bool {
 		return c.media.Start(config.GetCacheGTSMediaSweepFreq())
@@ -153,7 +171,9 @@ func (c *gtsCaches) Stop() {
 	tryUntil("stopping gtsmodel.DomainBlock cache", 5, c.domainBlock.Stop)
 	tryUntil("stopping gtsmodel.Emoji cache", 5, c.emoji.Stop)
 	tryUntil("stopping gtsmodel.EmojiCategory cache", 5, c.emojiCategory.Stop)
-	tryUntil("stopping gtsmodel.MediaAttention cache", 5, c.media.Stop)
+	tryUntil("stopping gtsmodel.Follow cache", 5, c.follow.Stop)
+	tryUntil("stopping gtsmodel.FollowRequest cache", 5, c.followRequest.Stop)
+	tryUntil("stopping gtsmodel.MediaAttachment cache", 5, c.media.Stop)
 	tryUntil("stopping gtsmodel.Mention cache", 5, c.mention.Stop)
 	tryUntil("stopping gtsmodel.Notification cache", 5, c.notification.Stop)
 	tryUntil("stopping gtsmodel.Report cache", 5, c.report.Stop)
@@ -180,6 +200,14 @@ func (c *gtsCaches) Emoji() *result.Cache[*gtsmodel.Emoji] {
 
 func (c *gtsCaches) EmojiCategory() *result.Cache[*gtsmodel.EmojiCategory] {
 	return c.emojiCategory
+}
+
+func (c *gtsCaches) Follow() *result.Cache[*gtsmodel.Follow] {
+	return c.follow
+}
+
+func (c *gtsCaches) FollowRequest() *result.Cache[*gtsmodel.FollowRequest] {
+	return c.followRequest
 }
 
 func (c *gtsCaches) Media() *result.Cache[*gtsmodel.MediaAttachment] {
@@ -269,6 +297,32 @@ func (c *gtsCaches) initEmojiCategory() {
 		return c2
 	}, config.GetCacheGTSEmojiCategoryMaxSize())
 	c.emojiCategory.SetTTL(config.GetCacheGTSEmojiCategoryTTL(), true)
+}
+
+func (c *gtsCaches) initFollow() {
+	c.follow = result.New([]result.Lookup{
+		{Name: "ID"},
+		{Name: "URI"},
+		{Name: "AccountID.TargetAccountID"},
+	}, func(f1 *gtsmodel.Follow) *gtsmodel.Follow {
+		f2 := new(gtsmodel.Follow)
+		*f2 = *f1
+		return f2
+	}, 1000)
+	c.follow.SetTTL(time.Second*30, true)
+}
+
+func (c *gtsCaches) initFollowRequest() {
+	c.followRequest = result.New([]result.Lookup{
+		{Name: "ID"},
+		{Name: "URI"},
+		{Name: "AccountID.TargetAccountID"},
+	}, func(f1 *gtsmodel.FollowRequest) *gtsmodel.FollowRequest {
+		f2 := new(gtsmodel.FollowRequest)
+		*f2 = *f1
+		return f2
+	}, 1000)
+	c.followRequest.SetTTL(time.Second*30, true)
 }
 
 func (c *gtsCaches) initMedia() {

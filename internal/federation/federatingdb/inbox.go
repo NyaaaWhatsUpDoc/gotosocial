@@ -90,7 +90,7 @@ func (f *federatingDB) InboxesForIRI(c context.Context, iri *url.URL) (inboxIRIs
 			return nil, fmt.Errorf("couldn't find local account with username %s: %s", localAccountUsername, err)
 		}
 
-		follows, err := f.state.DB.GetAccountFollowedBy(c, account.ID, false)
+		follows, err := f.state.DB.GetAccountFollowedBys(c, account.ID)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't get followers of local account %s: %s", localAccountUsername, err)
 		}

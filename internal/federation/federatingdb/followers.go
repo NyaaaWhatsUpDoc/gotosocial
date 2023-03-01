@@ -29,7 +29,7 @@ func (f *federatingDB) Followers(ctx context.Context, actorIRI *url.URL) (follow
 		return nil, err
 	}
 
-	acctFollowers, err := f.state.DB.GetAccountFollowedBy(ctx, acct.ID, false)
+	acctFollowers, err := f.state.DB.GetAccountFollowedBys(ctx, acct.ID)
 	if err != nil {
 		return nil, fmt.Errorf("Followers: db error getting followers for account id %s: %s", acct.ID, err)
 	}

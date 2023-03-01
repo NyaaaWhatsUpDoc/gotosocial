@@ -26,6 +26,7 @@ import (
 
 	"github.com/superseriousbusiness/gotosocial/internal/config"
 	"github.com/superseriousbusiness/gotosocial/internal/db"
+	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
@@ -38,18 +39,16 @@ type accountDB struct {
 	state *state.State
 }
 
-func (a *accountDB) newAccountQ(account *gtsmodel.Account) *bun.SelectQuery {
-	return a.conn.
-		NewSelect().
-		Model(account)
-}
-
 func (a *accountDB) GetAccountByID(ctx context.Context, id string) (*gtsmodel.Account, db.Error) {
 	return a.getAccount(
 		ctx,
 		"ID",
 		func(account *gtsmodel.Account) error {
-			return a.newAccountQ(account).Where("? = ?", bun.Ident("account.id"), id).Scan(ctx)
+			return a.conn.
+				NewSelect().
+				Model(account).
+				Where("? = ?", bun.Ident("account.id"), id).
+				Scan(ctx)
 		},
 		id,
 	)
@@ -60,7 +59,11 @@ func (a *accountDB) GetAccountByURI(ctx context.Context, uri string) (*gtsmodel.
 		ctx,
 		"URI",
 		func(account *gtsmodel.Account) error {
-			return a.newAccountQ(account).Where("? = ?", bun.Ident("account.uri"), uri).Scan(ctx)
+			return a.conn.
+				NewSelect().
+				Model(account).
+				Where("? = ?", bun.Ident("account.uri"), uri).
+				Scan(ctx)
 		},
 		uri,
 	)
@@ -71,7 +74,11 @@ func (a *accountDB) GetAccountByURL(ctx context.Context, url string) (*gtsmodel.
 		ctx,
 		"URL",
 		func(account *gtsmodel.Account) error {
-			return a.newAccountQ(account).Where("? = ?", bun.Ident("account.url"), url).Scan(ctx)
+			return a.conn.
+				NewSelect().
+				Model(account).
+				Where("? = ?", bun.Ident("account.url"), url).
+				Scan(ctx)
 		},
 		url,
 	)
@@ -82,7 +89,7 @@ func (a *accountDB) GetAccountByUsernameDomain(ctx context.Context, username str
 		ctx,
 		"Username.Domain",
 		func(account *gtsmodel.Account) error {
-			q := a.newAccountQ(account)
+			q := a.conn.NewSelect().Model(account)
 
 			if domain != "" {
 				q = q.
@@ -106,7 +113,11 @@ func (a *accountDB) GetAccountByPubkeyID(ctx context.Context, id string) (*gtsmo
 		ctx,
 		"PublicKeyURI",
 		func(account *gtsmodel.Account) error {
-			return a.newAccountQ(account).Where("? = ?", bun.Ident("account.public_key_uri"), id).Scan(ctx)
+			return a.conn.
+				NewSelect().
+				Model(account).
+				Where("? = ?", bun.Ident("account.public_key_uri"), id).
+				Scan(ctx)
 		},
 		id,
 	)
@@ -142,9 +153,17 @@ func (a *accountDB) getAccount(ctx context.Context, lookup string, dbQuery func(
 		return nil, err
 	}
 
+	if gtscontext.Barebones(ctx) {
+		// Only a barebones model was requested.
+		return account, nil
+	}
+
 	if account.AvatarMediaAttachmentID != "" {
 		// Set the account's related avatar
-		account.AvatarMediaAttachment, err = a.state.DB.GetAttachmentByID(ctx, account.AvatarMediaAttachmentID)
+		account.AvatarMediaAttachment, err = a.state.DB.GetAttachmentByID(
+			gtscontext.SetBarebones(ctx),
+			account.AvatarMediaAttachmentID,
+		)
 		if err != nil {
 			log.Errorf(ctx, "error getting account %s avatar: %v", account.ID, err)
 		}
@@ -152,7 +171,10 @@ func (a *accountDB) getAccount(ctx context.Context, lookup string, dbQuery func(
 
 	if account.HeaderMediaAttachmentID != "" {
 		// Set the account's related header
-		account.HeaderMediaAttachment, err = a.state.DB.GetAttachmentByID(ctx, account.HeaderMediaAttachmentID)
+		account.HeaderMediaAttachment, err = a.state.DB.GetAttachmentByID(
+			gtscontext.SetBarebones(ctx),
+			account.HeaderMediaAttachmentID,
+		)
 		if err != nil {
 			log.Errorf(ctx, "error getting account %s header: %v", account.ID, err)
 		}
@@ -160,7 +182,10 @@ func (a *accountDB) getAccount(ctx context.Context, lookup string, dbQuery func(
 
 	if len(account.EmojiIDs) > 0 {
 		// Set the account's related emojis
-		account.Emojis, err = a.state.DB.GetEmojisByIDs(ctx, account.EmojiIDs)
+		account.Emojis, err = a.state.DB.GetEmojisByIDs(
+			gtscontext.SetBarebones(ctx),
+			account.EmojiIDs,
+		)
 		if err != nil {
 			log.Errorf(ctx, "error getting account %s emojis: %v", account.ID, err)
 		}
@@ -431,7 +456,11 @@ func (a *accountDB) GetAccountStatuses(ctx context.Context, accountID string, li
 		return nil, a.conn.ProcessError(err)
 	}
 
-	return a.statusesFromIDs(ctx, statusIDs)
+	if len(statusIDs) == 0 {
+		return nil, db.ErrNoEntries
+	}
+
+	return a.state.DB.GetStatuses(ctx, statusIDs)
 }
 
 func (a *accountDB) GetAccountPinnedStatuses(ctx context.Context, accountID string) ([]*gtsmodel.Status, db.Error) {
@@ -449,7 +478,11 @@ func (a *accountDB) GetAccountPinnedStatuses(ctx context.Context, accountID stri
 		return nil, a.conn.ProcessError(err)
 	}
 
-	return a.statusesFromIDs(ctx, statusIDs)
+	if len(statusIDs) == 0 {
+		return nil, db.ErrNoEntries
+	}
+
+	return a.state.DB.GetStatuses(ctx, statusIDs)
 }
 
 func (a *accountDB) GetAccountWebStatuses(ctx context.Context, accountID string, limit int, maxID string) ([]*gtsmodel.Status, db.Error) {
@@ -475,7 +508,11 @@ func (a *accountDB) GetAccountWebStatuses(ctx context.Context, accountID string,
 		return nil, a.conn.ProcessError(err)
 	}
 
-	return a.statusesFromIDs(ctx, statusIDs)
+	if len(statusIDs) == 0 {
+		return nil, db.ErrNoEntries
+	}
+
+	return a.state.DB.GetStatuses(ctx, statusIDs)
 }
 
 func (a *accountDB) GetBookmarks(ctx context.Context, accountID string, limit int, maxID string, minID string) ([]*gtsmodel.StatusBookmark, db.Error) {
@@ -548,28 +585,4 @@ func (a *accountDB) GetAccountBlocks(ctx context.Context, accountID string, maxI
 	nextMaxID := blocks[len(blocks)-1].ID
 	prevMinID := blocks[0].ID
 	return accounts, nextMaxID, prevMinID, nil
-}
-
-func (a *accountDB) statusesFromIDs(ctx context.Context, statusIDs []string) ([]*gtsmodel.Status, db.Error) {
-	// Catch case of no statuses early
-	if len(statusIDs) == 0 {
-		return nil, db.ErrNoEntries
-	}
-
-	// Allocate return slice (will be at most len statusIDS)
-	statuses := make([]*gtsmodel.Status, 0, len(statusIDs))
-
-	for _, id := range statusIDs {
-		// Fetch from status from database by ID
-		status, err := a.state.DB.GetStatusByID(ctx, id)
-		if err != nil {
-			log.Errorf(ctx, "error getting status %q: %v", id, err)
-			continue
-		}
-
-		// Append to return slice
-		statuses = append(statuses, status)
-	}
-
-	return statuses, nil
 }

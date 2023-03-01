@@ -125,7 +125,7 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 
 	// At this point we have a populated targetAccount, targetStatus, and requestingAccount, so we can check for blocks and whathaveyou
 	// First check if a block exists directly between the target account (which authored the status) and the requesting account.
-	if blocked, err := f.db.IsBlocked(ctx, targetAccount.ID, requestingAccount.ID, true); err != nil {
+	if blocked, err := f.db.IsMutualBlocked(ctx, targetAccount.ID, requestingAccount.ID); err != nil {
 		l.Debugf("something went wrong figuring out if the accounts have a block: %s", err)
 		return false, err
 	} else if blocked {
@@ -136,7 +136,7 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 
 	// If not in reply to the requesting account, check if inReplyToAccount is blocked
 	if relevantAccounts.InReplyToAccount != nil && relevantAccounts.InReplyToAccount.ID != requestingAccount.ID {
-		if blocked, err := f.db.IsBlocked(ctx, relevantAccounts.InReplyToAccount.ID, requestingAccount.ID, true); err != nil {
+		if blocked, err := f.db.IsMutualBlocked(ctx, relevantAccounts.InReplyToAccount.ID, requestingAccount.ID); err != nil {
 			return false, err
 		} else if blocked {
 			l.Trace("a block exists between requesting account and reply to account")
@@ -146,7 +146,7 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 
 	// status boosts accounts id
 	if relevantAccounts.BoostedAccount != nil {
-		if blocked, err := f.db.IsBlocked(ctx, relevantAccounts.BoostedAccount.ID, requestingAccount.ID, true); err != nil {
+		if blocked, err := f.db.IsMutualBlocked(ctx, relevantAccounts.BoostedAccount.ID, requestingAccount.ID); err != nil {
 			return false, err
 		} else if blocked {
 			l.Trace("a block exists between requesting account and boosted account")
@@ -156,7 +156,7 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 
 	// status boosts a reply to account id
 	if relevantAccounts.BoostedInReplyToAccount != nil {
-		if blocked, err := f.db.IsBlocked(ctx, relevantAccounts.BoostedInReplyToAccount.ID, requestingAccount.ID, true); err != nil {
+		if blocked, err := f.db.IsMutualBlocked(ctx, relevantAccounts.BoostedInReplyToAccount.ID, requestingAccount.ID); err != nil {
 			return false, err
 		} else if blocked {
 			l.Trace("a block exists between requesting account and boosted reply to account")
@@ -169,7 +169,7 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 		if a == nil {
 			continue
 		}
-		if blocked, err := f.db.IsBlocked(ctx, a.ID, requestingAccount.ID, true); err != nil {
+		if blocked, err := f.db.IsMutualBlocked(ctx, a.ID, requestingAccount.ID); err != nil {
 			return false, err
 		} else if blocked {
 			l.Trace("a block exists between requesting account and a boosted mentioned account")
@@ -178,28 +178,22 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 	}
 
 	// Iterate mentions to check for blocks or requester mentions
-	isMentioned, blockAmongMentions := false, false
+	var isMentioned bool
 	for _, a := range relevantAccounts.MentionedAccounts {
 		if a == nil {
 			continue
 		}
-
-		if blocked, err := f.db.IsBlocked(ctx, a.ID, requestingAccount.ID, true); err != nil {
+		if blocked, err := f.db.IsMutualBlocked(ctx, a.ID, requestingAccount.ID); err != nil {
 			return false, err
 		} else if blocked {
-			blockAmongMentions = true
-			break
+			return false, nil
 		}
-
 		if a.ID == requestingAccount.ID {
 			isMentioned = true
 		}
 	}
 
-	if blockAmongMentions {
-		l.Trace("a block exists between requesting account and a mentioned account")
-		return false, nil
-	} else if isMentioned {
+	if isMentioned {
 		// Requester mentioned, should always be visible
 		return true, nil
 	}
@@ -211,7 +205,7 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 		// no problem here
 	case gtsmodel.VisibilityFollowersOnly:
 		// Followers-only post, check for a one-way follow to target
-		follows, err := f.db.IsFollowing(ctx, requestingAccount, targetAccount)
+		follows, err := f.db.IsFollowing(ctx, requestingAccount.ID, targetAccount.ID)
 		if err != nil {
 			return false, err
 		}
@@ -221,7 +215,7 @@ func (f *filter) StatusVisible(ctx context.Context, targetStatus *gtsmodel.Statu
 		}
 	case gtsmodel.VisibilityMutualsOnly:
 		// Mutuals-only post, check for a mutual follow
-		mutuals, err := f.db.IsMutualFollowing(ctx, requestingAccount, targetAccount)
+		mutuals, err := f.db.IsMutualFollowing(ctx, requestingAccount.ID, targetAccount.ID)
 		if err != nil {
 			return false, err
 		}
