@@ -140,6 +140,14 @@ var Defaults = Configuration{
 			MediaTTL:       time.Minute * 5,
 			MediaSweepFreq: time.Second * 30,
 
+			FollowMaxSize:   500,
+			FollowTTL:       time.Minute * 5,
+			FollowSweepFreq: time.Second * 10,
+
+			FollowRequestMaxSize:   500,
+			FollowRequestTTL:       time.Minute * 5,
+			FollowRequestSweepFreq: time.Second * 10,
+
 			MentionMaxSize:   500,
 			MentionTTL:       time.Minute * 5,
 			MentionSweepFreq: time.Second * 30,

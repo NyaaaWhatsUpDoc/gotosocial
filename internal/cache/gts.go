@@ -19,8 +19,6 @@
 package cache
 
 import (
-	"time"
-
 	"codeberg.org/gruf/go-cache/v3/result"
 	"github.com/superseriousbusiness/gotosocial/internal/cache/domain"
 	"github.com/superseriousbusiness/gotosocial/internal/config"
@@ -137,10 +135,10 @@ func (c *gtsCaches) Start() {
 		return c.emojiCategory.Start(config.GetCacheGTSEmojiCategorySweepFreq())
 	})
 	tryUntil("starting gtsmodel.Follow cache", 5, func() bool {
-		return c.follow.Start(time.Second * 30)
+		return c.follow.Start(config.GetCacheGTSFollowSweepFreq())
 	})
 	tryUntil("starting gtsmodel.FollowRequest cache", 5, func() bool {
-		return c.followRequest.Start(time.Second * 30)
+		return c.followRequest.Start(config.GetCacheGTSFollowRequestSweepFreq())
 	})
 	tryUntil("starting gtsmodel.MediaAttachment cache", 5, func() bool {
 		return c.media.Start(config.GetCacheGTSMediaSweepFreq())
@@ -308,8 +306,8 @@ func (c *gtsCaches) initFollow() {
 		f2 := new(gtsmodel.Follow)
 		*f2 = *f1
 		return f2
-	}, 1000)
-	c.follow.SetTTL(time.Second*30, true)
+	}, config.GetCacheGTSFollowMaxSize())
+	c.follow.SetTTL(config.GetCacheGTSFollowTTL(), true)
 }
 
 func (c *gtsCaches) initFollowRequest() {
@@ -321,8 +319,8 @@ func (c *gtsCaches) initFollowRequest() {
 		f2 := new(gtsmodel.FollowRequest)
 		*f2 = *f1
 		return f2
-	}, 1000)
-	c.followRequest.SetTTL(time.Second*30, true)
+	}, config.GetCacheGTSFollowRequestMaxSize())
+	c.followRequest.SetTTL(config.GetCacheGTSFollowRequestTTL(), true)
 }
 
 func (c *gtsCaches) initMedia() {
