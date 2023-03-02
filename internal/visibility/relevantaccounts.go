@@ -220,27 +220,3 @@ func (f *filter) domainBlockedRelevant(ctx context.Context, r *relevantAccounts)
 
 	return f.db.AreDomainsBlocked(ctx, domains)
 }
-
-func idIn(id string, mentions []*gtsmodel.Mention) bool {
-	for _, m := range mentions {
-		if m == nil {
-			continue
-		}
-		if m.ID == id {
-			return true
-		}
-	}
-	return false
-}
-
-func mentionIn(mention *gtsmodel.Mention, ids []string) bool {
-	if mention == nil {
-		return false
-	}
-	for _, i := range ids {
-		if mention.ID == i {
-			return true
-		}
-	}
-	return false
-}
