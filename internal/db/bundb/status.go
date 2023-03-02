@@ -43,7 +43,6 @@ func (s *statusDB) newStatusQ(status interface{}) *bun.SelectQuery {
 	return s.conn.
 		NewSelect().
 		Model(status).
-		Relation("Attachments").
 		Relation("Tags").
 		Relation("CreatedWithApplication")
 }
@@ -198,11 +197,22 @@ func (s *statusDB) getStatus(ctx context.Context, lookup string, dbQuery func(*g
 	if len(status.MentionIDs) > 0 {
 		// Fetch status mentions
 		status.Mentions, err = s.state.DB.GetMentions(
-			gtscontext.SetBarebones(ctx),
+			ctx, // for now, return fully fleshed out.
 			status.MentionIDs,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("error getting status mentions: %w", err)
+		}
+	}
+
+	if len(status.AttachmentIDs) > 0 {
+		// Fetch status attachments
+		status.Attachments, err = s.state.DB.GetAttachments(
+			ctx, // is always barebones.
+			status.AttachmentIDs,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error getting status attachments: %w", err)
 		}
 	}
 

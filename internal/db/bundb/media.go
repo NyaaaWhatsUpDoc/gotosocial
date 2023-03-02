@@ -64,6 +64,24 @@ func (m *mediaDB) getAttachment(ctx context.Context, lookup string, dbQuery func
 	}, keyParts...)
 }
 
+func (m *mediaDB) GetAttachments(ctx context.Context, ids []string) ([]*gtsmodel.MediaAttachment, error) {
+	media := make([]*gtsmodel.MediaAttachment, 0, len(ids))
+
+	for _, id := range ids {
+		// Attempt fetch from database.
+		attach, err := m.GetAttachmentByID(ctx, id)
+		if err != nil {
+			log.Errorf(ctx, "error getting media attachment %q: %v", id, err)
+			continue
+		}
+
+		// Append media attachment.
+		media = append(media, attach)
+	}
+
+	return media, nil
+}
+
 func (m *mediaDB) PutAttachment(ctx context.Context, media *gtsmodel.MediaAttachment) error {
 	return m.state.Caches.GTS.Media().Store(media, func() error {
 		_, err := m.conn.NewInsert().Model(media).Exec(ctx)
