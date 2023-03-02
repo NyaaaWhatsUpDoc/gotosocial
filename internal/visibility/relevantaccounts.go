@@ -20,7 +20,6 @@ package visibility
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
@@ -82,8 +81,10 @@ func (f *filter) relevantAccounts(ctx context.Context, status *gtsmodel.Status, 
 		if err != nil {
 			return nil, fmt.Errorf("relevantAccounts: error getting account with id %s: %s", status.AccountID, err)
 		}
+
 		// set it on the status in case we need it further along
 		status.Account = account
+
 		// set it on relevant accounts
 		relAccts.Account = account
 	}
@@ -101,8 +102,10 @@ func (f *filter) relevantAccounts(ctx context.Context, status *gtsmodel.Status, 
 			if err != nil {
 				return nil, fmt.Errorf("relevantAccounts: error getting inReplyToAccount with id %s: %s", status.InReplyToAccountID, err)
 			}
+
 			// set it on the status in case we need it further along
 			status.InReplyToAccount = inReplyToAccount
+
 			// set it on relevant accounts
 			relAccts.InReplyToAccount = inReplyToAccount
 		}
@@ -110,48 +113,58 @@ func (f *filter) relevantAccounts(ctx context.Context, status *gtsmodel.Status, 
 
 	// 3. MentionedAccounts
 	// First check if status.Mentions is populated with all mentions that correspond to status.MentionIDs
-	for _, mID := range status.MentionIDs {
-		if mID == "" {
-			continue
+	for _, id := range status.MentionIDs {
+		var mention *gtsmodel.Mention
+
+		// Check if we already have this mention.
+		for _, m := range status.Mentions {
+			if m.ID == id {
+				mention = m
+				break
+			}
 		}
-		if !idIn(mID, status.Mentions) {
-			// mention with ID isn't in status.Mentions
-			mention, err := f.db.GetMention(ctx, mID)
+
+		if mention == nil {
+			var err error
+
+			// Status mention not yet populated, fetch from db.
+			mention, err = f.db.GetMention(ctx, id)
 			if err != nil {
-				return nil, fmt.Errorf("relevantAccounts: error getting mention with id %s: %s", mID, err)
+				return nil, fmt.Errorf("relevantAccounts: error getting mention with id %s: %s", id, err)
 			}
-			if mention == nil {
-				return nil, fmt.Errorf("relevantAccounts: mention with id %s was nil", mID)
-			}
+
+			// Append this mention to status mentions.
 			status.Mentions = append(status.Mentions, mention)
 		}
-	}
-	// now filter mentions to make sure we only have mentions with a corresponding ID
-	nm := []*gtsmodel.Mention{}
-	for _, m := range status.Mentions {
-		if m == nil {
-			continue
-		}
-		if mentionIn(m, status.MentionIDs) {
-			nm = append(nm, m)
-			relAccts.MentionedAccounts = append(relAccts.MentionedAccounts, m.TargetAccount)
-		}
-	}
-	status.Mentions = nm
 
-	if len(status.Mentions) != len(status.MentionIDs) {
-		return nil, errors.New("relevantAccounts: mentions length did not correspond with mentionIDs length")
+		if mention.TargetAccount == nil {
+			var err error
+
+			// Mention target account not yet populated, fetch from db.
+			mention.TargetAccount, err = f.db.GetAccountByID(ctx, mention.TargetAccountID)
+			if err != nil {
+				return nil, fmt.Errorf("relevantAccounts: error getting mention target account with id %s: %s", mention.TargetAccountID, err)
+			}
+		}
+
+		// Append mention target to relevant accounts.
+		relAccts.MentionedAccounts = append(
+			relAccts.MentionedAccounts,
+			mention.TargetAccount,
+		)
 	}
 
-	// if getBoosted is set, we should check the same properties on the boosted account as well
 	if getBoosted {
-		// 4, 5, 6. Boosted status items
-		// get the boosted status if it's not set on the status already
+		// 4, 5, 6. -- fetch relevant boosted status accounts.
+
 		if status.BoostOfID != "" && status.BoostOf == nil {
+			// get the boosted status if it's not set on the status already
 			boostedStatus, err := f.db.GetStatusByID(ctx, status.BoostOfID)
 			if err != nil {
 				return nil, fmt.Errorf("relevantAccounts: error getting boosted status with id %s: %s", status.BoostOfID, err)
 			}
+
+			// Set the boosted status.
 			status.BoostOf = boostedStatus
 		}
 
@@ -161,6 +174,8 @@ func (f *filter) relevantAccounts(ctx context.Context, status *gtsmodel.Status, 
 			if err != nil {
 				return nil, fmt.Errorf("relevantAccounts: error getting relevant accounts of boosted status %s: %s", status.BoostOf.ID, err)
 			}
+
+			// Set relevant boosted accounts information.
 			relAccts.BoostedAccount = boostedRelAccts.Account
 			relAccts.BoostedInReplyToAccount = boostedRelAccts.InReplyToAccount
 			relAccts.BoostedMentionedAccounts = boostedRelAccts.MentionedAccounts

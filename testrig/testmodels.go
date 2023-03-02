@@ -1624,7 +1624,7 @@ func NewTestStatuses() map[string]*gtsmodel.Status {
 			UpdatedAt:                TimeMustParse("2021-10-20T12:40:37+02:00"),
 			Local:                    TrueBool(),
 			AccountURI:               "http://localhost:8080/users/1happyturtle",
-			MentionIDs:               []string{"01FDF2HM2NF6FSRZCDEDV451CN"},
+			MentionIDs:               []string{"01FN3VKDEF4CN2W9TKX339BEHB"},
 			AccountID:                "01F8MH5NBDF2MV7CTC4Q5128HF",
 			InReplyToID:              "",
 			InReplyToAccountID:       "",
