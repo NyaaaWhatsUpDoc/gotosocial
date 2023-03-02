@@ -142,11 +142,11 @@ var Defaults = Configuration{
 
 			FollowMaxSize:   500,
 			FollowTTL:       time.Minute * 5,
-			FollowSweepFreq: time.Second * 10,
+			FollowSweepFreq: time.Second * 30,
 
 			FollowRequestMaxSize:   500,
 			FollowRequestTTL:       time.Minute * 5,
-			FollowRequestSweepFreq: time.Second * 10,
+			FollowRequestSweepFreq: time.Second * 30,
 
 			MentionMaxSize:   500,
 			MentionTTL:       time.Minute * 5,
