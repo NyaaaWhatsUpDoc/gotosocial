@@ -107,7 +107,7 @@ func (m *manager) RefetchEmojis(ctx context.Context, domain string, dereferenceM
 			return dereferenceMedia(ctx, emojiImageIRI)
 		}
 
-		processingEmoji, err := m.PreProcessEmoji(ctx, dataFunc, nil, emoji.Shortcode, emoji.ID, emoji.URI, &AdditionalEmojiInfo{
+		processingEmoji, err := m.PreProcessEmoji(ctx, dataFunc, emoji.Shortcode, emoji.ID, emoji.URI, &AdditionalEmojiInfo{
 			Domain:               &emoji.Domain,
 			ImageRemoteURL:       &emoji.ImageRemoteURL,
 			ImageStaticRemoteURL: &emoji.ImageStaticRemoteURL,

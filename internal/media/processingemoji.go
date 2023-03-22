@@ -26,6 +26,7 @@ import (
 	"codeberg.org/gruf/go-bytesize"
 	"codeberg.org/gruf/go-errors/v2"
 	"codeberg.org/gruf/go-runners"
+	"codeberg.org/gruf/go-store/v2/storage"
 	"github.com/h2non/filetype"
 	"github.com/superseriousbusiness/gotosocial/internal/config"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
@@ -36,16 +37,15 @@ import (
 // ProcessingEmoji represents an emoji currently processing. It exposes
 // various functions for retrieving data from the process.
 type ProcessingEmoji struct {
-	instAccID string               // instance account ID
-	emoji     *gtsmodel.Emoji      // processing emoji details
-	refresh   bool                 // whether this is an existing emoji being refreshed
-	newPathID string               // new emoji path ID to use if refreshed
-	dataFn    DataFunc             // load-data function, returns media stream
-	postFn    PostDataCallbackFunc // post data callback function
-	done      bool                 // done is set when process finishes with non ctx canceled type error
-	proc      runners.Processor    // proc helps synchronize only a singular running processing instance
-	err       error                // error stores permanent error value when done
-	mgr       *manager             // mgr instance (access to db / storage)
+	instAccID string            // instance account ID
+	emoji     *gtsmodel.Emoji   // processing emoji details
+	refresh   bool              // whether this is an existing emoji being refreshed
+	newPathID string            // new emoji path ID to use if refreshed
+	dataFn    DataFunc          // load-data function, returns media stream
+	done      bool              // done is set when process finishes with non ctx canceled type error
+	proc      runners.Processor // proc helps synchronize only a singular running processing instance
+	err       error             // error stores permanent error value when done
+	mgr       *manager          // mgr instance (access to db / storage)
 }
 
 // EmojiID returns the ID of the underlying emoji without blocking processing.
@@ -109,6 +109,10 @@ func (p *ProcessingEmoji) load(ctx context.Context) (*gtsmodel.Emoji, bool, erro
 			p.err = err
 		}()
 
+		// Get the starting image paths.
+		staticPath := p.emoji.ImageStaticPath
+		emojiPath := p.emoji.ImagePath
+
 		// Attempt to store media and calculate
 		// full-size media attachment details.
 		if err = p.store(ctx); err != nil {
@@ -138,6 +142,16 @@ func (p *ProcessingEmoji) load(ctx context.Context) (*gtsmodel.Emoji, bool, erro
 				"uri",
 			}
 
+			// Clear the old emoji image path from storage, we ignore "not found" errors.
+			if err := p.mgr.state.Storage.Delete(ctx, emojiPath); err != nil && !errors.Is(err, storage.ErrNotFound) {
+				log.Errorf(ctx, "error cleaning up old emoji image at %s for refreshed emoji: %v", emojiPath, err)
+			}
+
+			// Clear the old emoji static image path from storage, we ignore "not found" errors.
+			if err := p.mgr.state.Storage.Delete(ctx, staticPath); err != nil && !errors.Is(err, storage.ErrNotFound) {
+				log.Errorf(ctx, "error cleaning up old emoji static image at %s for refreshed emoji: %v", staticPath, err)
+			}
+
 			// Existing emoji we're refreshing, so only need to update.
 			_, err = p.mgr.state.DB.UpdateEmoji(ctx, p.emoji, columns...)
 			return err
@@ -159,17 +173,6 @@ func (p *ProcessingEmoji) load(ctx context.Context) (*gtsmodel.Emoji, bool, erro
 // and updates the underlying attachment fields as necessary. It will then stream
 // bytes from p's reader directly into storage so that it can be retrieved later.
 func (p *ProcessingEmoji) store(ctx context.Context) error {
-	defer func() {
-		if p.postFn == nil {
-			return
-		}
-
-		// Ensure post callback gets called.
-		if err := p.postFn(ctx); err != nil {
-			log.Errorf(ctx, "error executing postdata function: %v", err)
-		}
-	}()
-
 	// Load media from provided data fn.
 	rc, sz, err := p.dataFn(ctx)
 	if err != nil {
@@ -238,7 +241,7 @@ func (p *ProcessingEmoji) store(ctx context.Context) error {
 		pathID = p.emoji.ID
 	}
 
-	// Calculate emoji file path.
+	// Calculate emoji file and URL paths.
 	p.emoji.ImagePath = fmt.Sprintf(
 		"%s/%s/%s/%s.%s",
 		p.instAccID,
@@ -246,6 +249,30 @@ func (p *ProcessingEmoji) store(ctx context.Context) error {
 		SizeOriginal,
 		pathID,
 		info.Extension,
+	)
+	p.emoji.ImageStaticPath = fmt.Sprintf(
+		"%s/%s/%s/%s.%s",
+		p.instAccID,
+		TypeEmoji,
+		SizeStatic,
+		pathID,
+		mimePng,
+	)
+
+	// Calculate emoji file and static URL paths.
+	p.emoji.ImageURL = uris.GenerateURIForAttachment(
+		p.instAccID,
+		string(TypeEmoji),
+		string(SizeOriginal),
+		pathID,
+		info.Extension,
+	)
+	p.emoji.ImageStaticURL = uris.GenerateURIForAttachment(
+		p.instAccID,
+		string(TypeEmoji),
+		string(SizeStatic),
+		pathID,
+		mimePng,
 	)
 
 	// This shouldn't already exist, but we do a check as it's worth logging.
@@ -266,21 +293,14 @@ func (p *ProcessingEmoji) store(ctx context.Context) error {
 
 	// Once again check size in case none was provided previously.
 	if size := bytesize.Size(sz); size > maxSize {
-
 		if err := p.mgr.state.Storage.Delete(ctx, p.emoji.ImagePath); err != nil {
 			log.Errorf(ctx, "error removing too-large-emoji from storage: %v", err)
 		}
+
 		return fmt.Errorf("calculated emoji size %s greater than max allowed %s", size, maxSize)
 	}
 
-	// Fill in remaining attachment data now it's stored.
-	p.emoji.ImageURL = uris.GenerateURIForAttachment(
-		p.instAccID,
-		string(TypeEmoji),
-		string(SizeOriginal),
-		pathID,
-		info.Extension,
-	)
+	// Fill in remaining attachment data.
 	p.emoji.ImageContentType = info.MIME.Value
 	p.emoji.ImageFileSize = int(sz)
 
@@ -309,6 +329,7 @@ func (p *ProcessingEmoji) finish(ctx context.Context) error {
 	// This shouldn't already exist, but we do a check as it's worth logging.
 	if have, _ := p.mgr.state.Storage.Has(ctx, p.emoji.ImageStaticPath); have {
 		log.Warnf(ctx, "static emoji already exists at storage path: %s", p.emoji.ImagePath)
+
 		// Attempt to remove static existing emoji at storage path (might be broken / out-of-date)
 		if err := p.mgr.state.Storage.Delete(ctx, p.emoji.ImageStaticPath); err != nil {
 			return fmt.Errorf("error removing static emoji from storage: %v", err)

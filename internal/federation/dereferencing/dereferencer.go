@@ -27,6 +27,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/media"
+	"github.com/superseriousbusiness/gotosocial/internal/state"
 	"github.com/superseriousbusiness/gotosocial/internal/transport"
 	"github.com/superseriousbusiness/gotosocial/internal/typeutils"
 )
@@ -59,6 +60,7 @@ type Dereferencer interface {
 
 type deref struct {
 	db                  db.DB
+	state               *state.State
 	typeConverter       typeutils.TypeConverter
 	transportController transport.Controller
 	mediaManager        media.Manager

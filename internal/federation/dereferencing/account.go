@@ -415,7 +415,7 @@ func (d *deref) fetchRemoteAccountAvatar(ctx context.Context, tsport transport.T
 		}
 
 		// Create new media processing request from the media manager instance.
-		processing, err = d.mediaManager.PreProcessMedia(ctx, data, nil, accountID, &media.AdditionalMediaInfo{
+		processing, err = d.mediaManager.PreProcessMedia(ctx, data, accountID, &media.AdditionalMediaInfo{
 			Avatar:    func() *bool { v := true; return &v }(),
 			RemoteURL: &avatarURL,
 		})
@@ -426,21 +426,22 @@ func (d *deref) fetchRemoteAccountAvatar(ctx context.Context, tsport transport.T
 		// Store media in map to mark as processing.
 		d.derefAvatars[avatarURL] = processing
 
-		defer func() {
-			// On exit safely remove media from map.
-			unlock := d.derefAvatarsMu.Lock()
-			delete(d.derefAvatars, avatarURL)
-			unlock()
-		}()
+		// Manually start media async processing to clear from map after finish.
+		_ = d.state.Workers.Media.MustEnqueueCtx(ctx, func(ctx context.Context) {
+			defer func() {
+				// On finish safely remove media from map.
+				unlock := d.derefAvatarsMu.Lock()
+				delete(d.derefAvatars, avatarURL)
+				unlock()
+			}()
+
+			// Set media to process.
+			processing.Process(ctx)
+		})
 	}
 
 	// Unlock map.
 	unlock()
-
-	// Start media attachment loading (blocking call).
-	if _, err := processing.LoadAttachment(ctx); err != nil {
-		return "", err
-	}
 
 	return processing.AttachmentID(), nil
 }
@@ -468,7 +469,7 @@ func (d *deref) fetchRemoteAccountHeader(ctx context.Context, tsport transport.T
 		}
 
 		// Create new media processing request from the media manager instance.
-		processing, err = d.mediaManager.PreProcessMedia(ctx, data, nil, accountID, &media.AdditionalMediaInfo{
+		processing, err = d.mediaManager.PreProcessMedia(ctx, data, accountID, &media.AdditionalMediaInfo{
 			Header:    func() *bool { v := true; return &v }(),
 			RemoteURL: &headerURL,
 		})
@@ -479,21 +480,22 @@ func (d *deref) fetchRemoteAccountHeader(ctx context.Context, tsport transport.T
 		// Store media in map to mark as processing.
 		d.derefHeaders[headerURL] = processing
 
-		defer func() {
-			// On exit safely remove media from map.
-			unlock := d.derefHeadersMu.Lock()
-			delete(d.derefHeaders, headerURL)
-			unlock()
-		}()
+		// Manually start media async processing to clear from map after finish.
+		_ = d.state.Workers.Media.MustEnqueueCtx(ctx, func(ctx context.Context) {
+			defer func() {
+				// On finish safely remove media from map.
+				unlock := d.derefHeadersMu.Lock()
+				delete(d.derefHeaders, headerURL)
+				unlock()
+			}()
+
+			// Set media to process.
+			processing.Process(ctx)
+		})
 	}
 
 	// Unlock map.
 	unlock()
-
-	// Start media attachment loading (blocking call).
-	if _, err := processing.LoadAttachment(ctx); err != nil {
-		return "", err
-	}
 
 	return processing.AttachmentID(), nil
 }

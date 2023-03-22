@@ -161,7 +161,7 @@ func (p *Processor) getAttachmentContent(ctx context.Context, requestingAccount 
 		}
 
 		// Start recaching this media with the prepared data function.
-		processingMedia, err := p.mediaManager.PreProcessMediaRecache(ctx, dataFn, nil, wantedMediaID)
+		processingMedia, err := p.mediaManager.PreProcessMediaRecache(ctx, dataFn, wantedMediaID)
 		if err != nil {
 			return nil, gtserror.NewErrorNotFound(fmt.Errorf("error recaching media: %s", err))
 		}
