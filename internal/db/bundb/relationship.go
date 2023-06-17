@@ -89,87 +89,189 @@ func (r *relationshipDB) GetRelationship(ctx context.Context, requestingAccount 
 }
 
 func (r *relationshipDB) GetAccountFollows(ctx context.Context, accountID string) ([]*gtsmodel.Follow, error) {
-	var followIDs []string
-	if err := newSelectFollows(r.conn, accountID).
-		Scan(ctx, &followIDs); err != nil {
-		return nil, r.conn.ProcessError(err)
+	followIDs, err := r.getAccountFollowIDs(ctx, accountID)
+	if err != nil {
+		return nil, err
 	}
 	return r.GetFollowsByIDs(ctx, followIDs)
 }
 
 func (r *relationshipDB) GetAccountLocalFollows(ctx context.Context, accountID string) ([]*gtsmodel.Follow, error) {
-	var followIDs []string
-	if err := newSelectLocalFollows(r.conn, accountID).
-		Scan(ctx, &followIDs); err != nil {
-		return nil, r.conn.ProcessError(err)
+	followIDs, err := r.getAccountLocalFollowIDs(ctx, accountID)
+	if err != nil {
+		return nil, err
 	}
 	return r.GetFollowsByIDs(ctx, followIDs)
 }
 
 func (r *relationshipDB) GetAccountFollowers(ctx context.Context, accountID string) ([]*gtsmodel.Follow, error) {
-	var followIDs []string
-	if err := newSelectFollowers(r.conn, accountID).
-		Scan(ctx, &followIDs); err != nil {
-		return nil, r.conn.ProcessError(err)
+	followerIDs, err := r.getAccountFollowerIDs(ctx, accountID)
+	if err != nil {
+		return nil, err
 	}
-	return r.GetFollowsByIDs(ctx, followIDs)
+	return r.GetFollowsByIDs(ctx, followerIDs)
 }
 
 func (r *relationshipDB) GetAccountLocalFollowers(ctx context.Context, accountID string) ([]*gtsmodel.Follow, error) {
-	var followIDs []string
-	if err := newSelectLocalFollowers(r.conn, accountID).
-		Scan(ctx, &followIDs); err != nil {
-		return nil, r.conn.ProcessError(err)
+	followerIDs, err := r.getAccountLocalFollowerIDs(ctx, accountID)
+	if err != nil {
+		return nil, err
 	}
-	return r.GetFollowsByIDs(ctx, followIDs)
+	return r.GetFollowsByIDs(ctx, followerIDs)
 }
 
 func (r *relationshipDB) CountAccountFollows(ctx context.Context, accountID string) (int, error) {
-	n, err := newSelectFollows(r.conn, accountID).Count(ctx)
-	return n, r.conn.ProcessError(err)
+	followIDs, err := r.getAccountFollowIDs(ctx, accountID)
+	return len(followIDs), err
 }
 
 func (r *relationshipDB) CountAccountLocalFollows(ctx context.Context, accountID string) (int, error) {
-	n, err := newSelectLocalFollows(r.conn, accountID).Count(ctx)
-	return n, r.conn.ProcessError(err)
+	followIDs, err := r.getAccountLocalFollowIDs(ctx, accountID)
+	return len(followIDs), err
 }
 
 func (r *relationshipDB) CountAccountFollowers(ctx context.Context, accountID string) (int, error) {
-	n, err := newSelectFollowers(r.conn, accountID).Count(ctx)
-	return n, r.conn.ProcessError(err)
+	followIDs, err := r.getAccountFollowerIDs(ctx, accountID)
+	return len(followIDs), err
 }
 
 func (r *relationshipDB) CountAccountLocalFollowers(ctx context.Context, accountID string) (int, error) {
-	n, err := newSelectLocalFollowers(r.conn, accountID).Count(ctx)
-	return n, r.conn.ProcessError(err)
+	followIDs, err := r.getAccountLocalFollowerIDs(ctx, accountID)
+	return len(followIDs), err
 }
 
 func (r *relationshipDB) GetAccountFollowRequests(ctx context.Context, accountID string) ([]*gtsmodel.FollowRequest, error) {
-	var followReqIDs []string
-	if err := newSelectFollowRequests(r.conn, accountID).
-		Scan(ctx, &followReqIDs); err != nil {
-		return nil, r.conn.ProcessError(err)
+	followReqIDs, err := r.getAccountFollowRequestIDs(ctx, accountID)
+	if err != nil {
+		return nil, err
 	}
 	return r.GetFollowRequestsByIDs(ctx, followReqIDs)
 }
 
 func (r *relationshipDB) GetAccountFollowRequesting(ctx context.Context, accountID string) ([]*gtsmodel.FollowRequest, error) {
-	var followReqIDs []string
-	if err := newSelectFollowRequesting(r.conn, accountID).
-		Scan(ctx, &followReqIDs); err != nil {
-		return nil, r.conn.ProcessError(err)
+	followReqIDs, err := r.getAccountFollowRequestingIDs(ctx, accountID)
+	if err != nil {
+		return nil, err
 	}
 	return r.GetFollowRequestsByIDs(ctx, followReqIDs)
 }
 
 func (r *relationshipDB) CountAccountFollowRequests(ctx context.Context, accountID string) (int, error) {
-	n, err := newSelectFollowRequests(r.conn, accountID).Count(ctx)
-	return n, r.conn.ProcessError(err)
+	followReqIDs, err := r.getAccountFollowRequestIDs(ctx, accountID)
+	return len(followReqIDs), err
 }
 
 func (r *relationshipDB) CountAccountFollowRequesting(ctx context.Context, accountID string) (int, error) {
-	n, err := newSelectFollowRequesting(r.conn, accountID).Count(ctx)
-	return n, r.conn.ProcessError(err)
+	followReqIDs, err := r.getAccountFollowRequestingIDs(ctx, accountID)
+	return len(followReqIDs), err
+}
+
+func (r *relationshipDB) getAccountFollowIDs(ctx context.Context, accountID string) ([]string, error) {
+	key := ">" + accountID
+
+	followIDs, ok := r.state.Caches.GTS.FollowIDs().Get(key)
+	if ok {
+		return followIDs, nil
+	}
+
+	if err := newSelectFollows(r.conn, accountID).
+		Scan(ctx, &followIDs); err != nil {
+		return nil, r.conn.ProcessError(err)
+	}
+
+	r.state.Caches.GTS.FollowIDs().Set(key, followIDs)
+
+	return followIDs, nil
+}
+
+func (r *relationshipDB) getAccountFollowerIDs(ctx context.Context, accountID string) ([]string, error) {
+	key := "<" + accountID
+
+	followerIDs, ok := r.state.Caches.GTS.FollowIDs().Get(key)
+	if ok {
+		return followerIDs, nil
+	}
+
+	if err := newSelectFollowers(r.conn, accountID).
+		Scan(ctx, &followerIDs); err != nil {
+		return nil, r.conn.ProcessError(err)
+	}
+
+	r.state.Caches.GTS.FollowIDs().Set(key, followerIDs)
+
+	return followerIDs, nil
+}
+
+func (r *relationshipDB) getAccountLocalFollowIDs(ctx context.Context, accountID string) ([]string, error) {
+	key := ">l" + accountID
+
+	followIDs, ok := r.state.Caches.GTS.FollowIDs().Get(key)
+	if ok {
+		return followIDs, nil
+	}
+
+	if err := newSelectLocalFollows(r.conn, accountID).
+		Scan(ctx, &followIDs); err != nil {
+		return nil, r.conn.ProcessError(err)
+	}
+
+	r.state.Caches.GTS.FollowIDs().Set(key, followIDs)
+
+	return followIDs, nil
+}
+
+func (r *relationshipDB) getAccountLocalFollowerIDs(ctx context.Context, accountID string) ([]string, error) {
+	key := "<l" + accountID
+
+	followerIDs, ok := r.state.Caches.GTS.FollowIDs().Get(key)
+	if ok {
+		return followerIDs, nil
+	}
+
+	if err := newSelectFollowers(r.conn, accountID).
+		Scan(ctx, &followerIDs); err != nil {
+		return nil, r.conn.ProcessError(err)
+	}
+
+	r.state.Caches.GTS.FollowIDs().Set(key, followerIDs)
+
+	return followerIDs, nil
+}
+
+func (r *relationshipDB) getAccountFollowRequestIDs(ctx context.Context, accountID string) ([]string, error) {
+	key := ">" + accountID
+
+	followReqIDs, ok := r.state.Caches.GTS.FollowRequestIDs().Get(key)
+	if ok {
+		return followReqIDs, nil
+	}
+
+	if err := newSelectFollowRequests(r.conn, accountID).
+		Scan(ctx, &followReqIDs); err != nil {
+		return nil, r.conn.ProcessError(err)
+	}
+
+	r.state.Caches.GTS.FollowRequestIDs().Set(key, followReqIDs)
+
+	return followReqIDs, nil
+}
+
+func (r *relationshipDB) getAccountFollowRequestingIDs(ctx context.Context, accountID string) ([]string, error) {
+	key := "<" + accountID
+
+	followReqIDs, ok := r.state.Caches.GTS.FollowRequestIDs().Get(key)
+	if ok {
+		return followReqIDs, nil
+	}
+
+	if err := newSelectFollowRequesting(r.conn, accountID).
+		Scan(ctx, &followReqIDs); err != nil {
+		return nil, r.conn.ProcessError(err)
+	}
+
+	r.state.Caches.GTS.FollowRequestIDs().Set(key, followReqIDs)
+
+	return followReqIDs, nil
 }
 
 // newSelectFollowRequests returns a new select query for all rows in the follow_requests table with target_account_id = accountID.

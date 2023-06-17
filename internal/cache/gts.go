@@ -30,21 +30,23 @@ type GTSCaches struct {
 	block   *result.Cache[*gtsmodel.Block]
 	// TODO: maybe should be moved out of here since it's
 	// not actually doing anything with gtsmodel.DomainBlock.
-	domainBlock   *domain.BlockCache
-	emoji         *result.Cache[*gtsmodel.Emoji]
-	emojiCategory *result.Cache[*gtsmodel.EmojiCategory]
-	follow        *result.Cache[*gtsmodel.Follow]
-	followRequest *result.Cache[*gtsmodel.FollowRequest]
-	list          *result.Cache[*gtsmodel.List]
-	listEntry     *result.Cache[*gtsmodel.ListEntry]
-	media         *result.Cache[*gtsmodel.MediaAttachment]
-	mention       *result.Cache[*gtsmodel.Mention]
-	notification  *result.Cache[*gtsmodel.Notification]
-	report        *result.Cache[*gtsmodel.Report]
-	status        *result.Cache[*gtsmodel.Status]
-	statusFave    *result.Cache[*gtsmodel.StatusFave]
-	tombstone     *result.Cache[*gtsmodel.Tombstone]
-	user          *result.Cache[*gtsmodel.User]
+	domainBlock      *domain.BlockCache
+	emoji            *result.Cache[*gtsmodel.Emoji]
+	emojiCategory    *result.Cache[*gtsmodel.EmojiCategory]
+	follow           *result.Cache[*gtsmodel.Follow]
+	followIDs        *ttl.Cache[string, []string]
+	followRequest    *result.Cache[*gtsmodel.FollowRequest]
+	followRequestIDs *ttl.Cache[string, []string]
+	list             *result.Cache[*gtsmodel.List]
+	listEntry        *result.Cache[*gtsmodel.ListEntry]
+	media            *result.Cache[*gtsmodel.MediaAttachment]
+	mention          *result.Cache[*gtsmodel.Mention]
+	notification     *result.Cache[*gtsmodel.Notification]
+	report           *result.Cache[*gtsmodel.Report]
+	status           *result.Cache[*gtsmodel.Status]
+	statusFave       *result.Cache[*gtsmodel.StatusFave]
+	tombstone        *result.Cache[*gtsmodel.Tombstone]
+	user             *result.Cache[*gtsmodel.User]
 	// TODO: move out of GTS caches since not using database models.
 	webfinger *ttl.Cache[string, string]
 }
@@ -58,7 +60,9 @@ func (c *GTSCaches) Init() {
 	c.initEmoji()
 	c.initEmojiCategory()
 	c.initFollow()
+	c.initFollowIDs()
 	c.initFollowRequest()
+	c.initFollowRequestIDs()
 	c.initList()
 	c.initListEntry()
 	c.initMedia()
@@ -79,7 +83,19 @@ func (c *GTSCaches) Start() {
 	tryStart(c.emoji, config.GetCacheGTSEmojiSweepFreq())
 	tryStart(c.emojiCategory, config.GetCacheGTSEmojiCategorySweepFreq())
 	tryStart(c.follow, config.GetCacheGTSFollowSweepFreq())
+	tryUntil("starting follow ID cache", 5, func() bool {
+		if sweep := config.GetCacheGTSFollowIDsSweepFreq(); sweep > 0 {
+			return c.followIDs.Start(sweep)
+		}
+		return true
+	})
 	tryStart(c.followRequest, config.GetCacheGTSFollowRequestSweepFreq())
+	tryUntil("starting follow request ID cache", 5, func() bool {
+		if sweep := config.GetCacheGTSFollowRequestIDsSweepFreq(); sweep > 0 {
+			return c.followRequestIDs.Start(sweep)
+		}
+		return true
+	})
 	tryStart(c.list, config.GetCacheGTSListSweepFreq())
 	tryStart(c.listEntry, config.GetCacheGTSListEntrySweepFreq())
 	tryStart(c.media, config.GetCacheGTSMediaSweepFreq())
@@ -149,9 +165,19 @@ func (c *GTSCaches) Follow() *result.Cache[*gtsmodel.Follow] {
 	return c.follow
 }
 
+// FollowIDs ...
+func (c *GTSCaches) FollowIDs() *ttl.Cache[string, []string] {
+	return c.followIDs
+}
+
 // FollowRequest provides access to the gtsmodel FollowRequest database cache.
 func (c *GTSCaches) FollowRequest() *result.Cache[*gtsmodel.FollowRequest] {
 	return c.followRequest
+}
+
+// FollowRequestIDs ...
+func (c *GTSCaches) FollowRequestIDs() *ttl.Cache[string, []string] {
+	return c.followRequestIDs
 }
 
 // List provides access to the gtsmodel List database cache.
@@ -288,6 +314,14 @@ func (c *GTSCaches) initFollow() {
 	c.follow.SetTTL(config.GetCacheGTSFollowTTL(), true)
 }
 
+func (c *GTSCaches) initFollowIDs() {
+	c.followIDs = ttl.New[string, []string](
+		0,
+		config.GetCacheGTSFollowIDsMaxSize(),
+		config.GetCacheGTSFollowIDsTTL(),
+	)
+}
+
 func (c *GTSCaches) initFollowRequest() {
 	c.followRequest = result.New([]result.Lookup{
 		{Name: "ID"},
@@ -299,6 +333,14 @@ func (c *GTSCaches) initFollowRequest() {
 		return f2
 	}, config.GetCacheGTSFollowRequestMaxSize())
 	c.followRequest.SetTTL(config.GetCacheGTSFollowRequestTTL(), true)
+}
+
+func (c *GTSCaches) initFollowRequestIDs() {
+	c.followRequestIDs = ttl.New[string, []string](
+		0,
+		config.GetCacheGTSFollowIDsMaxSize(),
+		config.GetCacheGTSFollowIDsTTL(),
+	)
 }
 
 func (c *GTSCaches) initList() {
