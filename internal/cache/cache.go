@@ -100,6 +100,14 @@ func (c *Caches) setuphooks() {
 		// Invalidate follow target account ID cached visibility.
 		c.Visibility.Invalidate("ItemID", follow.TargetAccountID)
 		c.Visibility.Invalidate("RequesterID", follow.TargetAccountID)
+
+		// Invalidate follow request account ID cached lists.
+		c.GTS.FollowIDs().Invalidate(">" + follow.AccountID)
+		c.GTS.FollowIDs().Invalidate("<" + follow.AccountID)
+
+		// Invalidate follow request target account ID cached lists.
+		c.GTS.FollowIDs().Invalidate(">" + follow.TargetAccountID)
+		c.GTS.FollowIDs().Invalidate("<" + follow.TargetAccountID)
 	})
 
 	c.GTS.FollowRequest().SetInvalidateCallback(func(followReq *gtsmodel.FollowRequest) {
@@ -110,6 +118,14 @@ func (c *Caches) setuphooks() {
 		// Invalidate follow request target account ID cached visibility.
 		c.Visibility.Invalidate("ItemID", followReq.TargetAccountID)
 		c.Visibility.Invalidate("RequesterID", followReq.TargetAccountID)
+
+		// Invalidate follow request account ID cached lists.
+		c.GTS.FollowRequestIDs().Invalidate(">" + followReq.AccountID)
+		c.GTS.FollowRequestIDs().Invalidate("<" + followReq.AccountID)
+
+		// Invalidate follow request target account ID cached lists.
+		c.GTS.FollowRequestIDs().Invalidate(">" + followReq.TargetAccountID)
+		c.GTS.FollowRequestIDs().Invalidate("<" + followReq.TargetAccountID)
 
 		// Invalidate any cached follow with same ID.
 		c.GTS.Follow().Invalidate("ID", followReq.ID)
