@@ -20,7 +20,6 @@ package account
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/superseriousbusiness/gotosocial/internal/ap"
 	apimodel "github.com/superseriousbusiness/gotosocial/internal/api/model"
@@ -46,7 +45,7 @@ func (p *Processor) FollowCreate(ctx context.Context, requestingAccount *gtsmode
 		requestingAccount.ID,
 		targetAccount.ID,
 	); err != nil && !errors.Is(err, db.ErrNoEntries) {
-		err = fmt.Errorf("FollowCreate: db error checking existing follow: %w", err)
+		err = gtserror.Newf("db error checking existing follow: %w", err)
 		return nil, gtserror.NewErrorInternalError(err)
 	} else if follow != nil {
 		// Already follows, update if necessary + return relationship.
@@ -66,7 +65,7 @@ func (p *Processor) FollowCreate(ctx context.Context, requestingAccount *gtsmode
 		requestingAccount.ID,
 		targetAccount.ID,
 	); err != nil && !errors.Is(err, db.ErrNoEntries) {
-		err = fmt.Errorf("FollowCreate: db error checking existing follow request: %w", err)
+		err = gtserror.Newf("db error checking existing follow request: %w", err)
 		return nil, gtserror.NewErrorInternalError(err)
 	} else if followRequest != nil {
 		// Already requested, update if necessary + return relationship.
@@ -100,7 +99,7 @@ func (p *Processor) FollowCreate(ctx context.Context, requestingAccount *gtsmode
 	}
 
 	if err := p.state.DB.PutFollowRequest(ctx, fr); err != nil {
-		err = fmt.Errorf("FollowCreate: error creating follow request in db: %s", err)
+		err = gtserror.Newf("error creating follow request in db: %s", err)
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
@@ -112,7 +111,7 @@ func (p *Processor) FollowCreate(ctx context.Context, requestingAccount *gtsmode
 		// Because we know the requestingAccount is also
 		// local, we don't need to federate the accept out.
 		if _, err := p.state.DB.AcceptFollowRequest(ctx, requestingAccount.ID, form.ID); err != nil {
-			err = fmt.Errorf("FollowCreate: error accepting follow request for local unlocked account: %w", err)
+			err = gtserror.Newf("error accepting follow request for local unlocked account: %w", err)
 			return nil, gtserror.NewErrorInternalError(err)
 		}
 	} else if targetAccount.IsRemote() {
@@ -140,13 +139,62 @@ func (p *Processor) FollowRemove(ctx context.Context, requestingAccount *gtsmode
 	// Unfollow and deal with side effects.
 	msgs, err := p.unfollow(ctx, requestingAccount, targetAccount)
 	if err != nil {
-		return nil, gtserror.NewErrorNotFound(fmt.Errorf("FollowRemove: account %s not found in the db: %s", targetAccountID, err))
+		return nil, gtserror.NewErrorNotFound(gtserror.Newf("account %s not found in the db: %s", targetAccountID, err))
 	}
 
 	// Batch queue accreted client api messages.
 	p.state.Workers.EnqueueClientAPI(ctx, msgs...)
 
 	return p.RelationshipGet(ctx, requestingAccount, targetAccountID)
+}
+
+// FollowRequestAccept ...
+func (p *Processor) FollowRequestAccept(ctx context.Context, requestingAccount *gtsmodel.Account, sourceAccountID string) (*apimodel.Relationship, gtserror.WithCode) {
+	follow, err := p.state.DB.AcceptFollowRequest(ctx, sourceAccountID, requestingAccount.ID)
+	if err != nil {
+		return nil, gtserror.NewErrorNotFound(err)
+	}
+
+	if follow.Account != nil {
+		// Only enqueue work in the case we have a request creating account stored.
+		// NOTE: due to how AcceptFollowRequest works, the inverse shouldn't be possible.
+		p.state.Workers.EnqueueClientAPI(ctx, messages.FromClientAPI{
+			APObjectType:   ap.ActivityFollow,
+			APActivityType: ap.ActivityAccept,
+			GTSModel:       follow,
+			OriginAccount:  follow.Account,
+			TargetAccount:  follow.TargetAccount,
+		})
+	}
+
+	return p.RelationshipGet(ctx, requestingAccount, sourceAccountID)
+}
+
+// FollowRequestReject ...
+func (p *Processor) FollowRequestReject(ctx context.Context, requestingAccount *gtsmodel.Account, sourceAccountID string) (*apimodel.Relationship, gtserror.WithCode) {
+	followRequest, err := p.state.DB.GetFollowRequest(ctx, sourceAccountID, requestingAccount.ID)
+	if err != nil {
+		return nil, gtserror.NewErrorNotFound(err)
+	}
+
+	err = p.state.DB.RejectFollowRequest(ctx, sourceAccountID, requestingAccount.ID)
+	if err != nil {
+		return nil, gtserror.NewErrorNotFound(err)
+	}
+
+	if followRequest.Account != nil {
+		// Only enqueue work in the case we have a request creating account stored.
+		// NOTE: due to how GetFollowRequest works, the inverse shouldn't be possible.
+		p.state.Workers.EnqueueClientAPI(ctx, messages.FromClientAPI{
+			APObjectType:   ap.ActivityFollow,
+			APActivityType: ap.ActivityReject,
+			GTSModel:       followRequest,
+			OriginAccount:  followRequest.Account,
+			TargetAccount:  followRequest.TargetAccount,
+		})
+	}
+
+	return p.RelationshipGet(ctx, requestingAccount, sourceAccountID)
 }
 
 /*
@@ -166,7 +214,6 @@ func (p *Processor) updateFollow(
 	currentNotify *bool,
 	update func(...string) error,
 ) (*apimodel.Relationship, gtserror.WithCode) {
-
 	if form.Reblogs == nil && form.Notify == nil {
 		// There's nothing to update.
 		return p.RelationshipGet(ctx, requestingAccount, form.ID)
@@ -192,7 +239,7 @@ func (p *Processor) updateFollow(
 	}
 
 	if err := update(columns...); err != nil {
-		err = fmt.Errorf("updateFollow: error updating existing follow (request): %w", err)
+		err = gtserror.Newf("error updating existing follow (request): %w", err)
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
@@ -212,7 +259,7 @@ func (p *Processor) getFollowTarget(ctx context.Context, requestingAccountID str
 
 	// Do nothing if a block exists in either direction between accounts.
 	if blocked, err := p.state.DB.IsEitherBlocked(ctx, requestingAccountID, targetAccountID); err != nil {
-		err = fmt.Errorf("db error checking block between accounts: %w", err)
+		err = gtserror.Newf("db error checking block between accounts: %w", err)
 		return nil, gtserror.NewErrorInternalError(err)
 	} else if blocked {
 		err = errors.New("block exists between accounts")
@@ -224,11 +271,11 @@ func (p *Processor) getFollowTarget(ctx context.Context, requestingAccountID str
 	if err != nil {
 		if !errors.Is(err, db.ErrNoEntries) {
 			// Real db error.
-			err = fmt.Errorf("db error looking for target account %s: %w", targetAccountID, err)
+			err = gtserror.Newf("db error looking for target account %s: %w", targetAccountID, err)
 			return nil, gtserror.NewErrorInternalError(err)
 		}
 		// Account not found.
-		err = fmt.Errorf("target account %s not found in the db", targetAccountID)
+		err = gtserror.Newf("target account %s not found in the db", targetAccountID)
 		return nil, gtserror.NewErrorNotFound(err, err.Error())
 	}
 
@@ -248,7 +295,7 @@ func (p *Processor) unfollow(ctx context.Context, requestingAccount *gtsmodel.Ac
 	// Get follow from requesting account to target account.
 	follow, err := p.state.DB.GetFollow(ctx, requestingAccount.ID, targetAccount.ID)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
-		err = fmt.Errorf("unfollow: error getting follow from %s targeting %s: %w", requestingAccount.ID, targetAccount.ID, err)
+		err = gtserror.Newf("error getting follow from %s targeting %s: %w", requestingAccount.ID, targetAccount.ID, err)
 		return nil, err
 	}
 
@@ -257,7 +304,7 @@ func (p *Processor) unfollow(ctx context.Context, requestingAccount *gtsmodel.Ac
 		err = p.state.DB.DeleteFollowByID(ctx, follow.ID)
 		if err != nil {
 			if !errors.Is(err, db.ErrNoEntries) {
-				err = fmt.Errorf("unfollow: error deleting request from %s targeting %s: %w", requestingAccount.ID, targetAccount.ID, err)
+				err = gtserror.Newf("error deleting request from %s targeting %s: %w", requestingAccount.ID, targetAccount.ID, err)
 				return nil, err
 			}
 
@@ -284,7 +331,7 @@ func (p *Processor) unfollow(ctx context.Context, requestingAccount *gtsmodel.Ac
 	// Get follow request from requesting account to target account.
 	followReq, err := p.state.DB.GetFollowRequest(ctx, requestingAccount.ID, targetAccount.ID)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
-		err = fmt.Errorf("unfollow: error getting follow request from %s targeting %s: %w", requestingAccount.ID, targetAccount.ID, err)
+		err = gtserror.Newf("error getting follow request from %s targeting %s: %w", requestingAccount.ID, targetAccount.ID, err)
 		return nil, err
 	}
 
@@ -293,7 +340,7 @@ func (p *Processor) unfollow(ctx context.Context, requestingAccount *gtsmodel.Ac
 		err = p.state.DB.DeleteFollowRequestByID(ctx, followReq.ID)
 		if err != nil {
 			if !errors.Is(err, db.ErrNoEntries) {
-				err = fmt.Errorf("unfollow: error deleting follow request from %s targeting %s: %w", requestingAccount.ID, targetAccount.ID, err)
+				err = gtserror.Newf("error deleting follow request from %s targeting %s: %w", requestingAccount.ID, targetAccount.ID, err)
 				return nil, err
 			}
 

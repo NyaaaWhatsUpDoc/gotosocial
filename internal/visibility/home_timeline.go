@@ -150,6 +150,7 @@ func (f *Filter) isStatusHomeTimelineable(ctx context.Context, owner *gtsmodel.A
 			return false, cache.SentinelError
 		}
 
+		// Fetch barebones status for next parent.
 		next, err = f.state.DB.GetStatusByID(
 			gtscontext.SetBarebones(ctx),
 			parentID,

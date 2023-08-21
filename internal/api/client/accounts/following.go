@@ -25,6 +25,7 @@ import (
 	apiutil "github.com/superseriousbusiness/gotosocial/internal/api/util"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // AccountFollowingGETHandler swagger:operation GET /api/v1/accounts/{id}/following accountFollowing
@@ -87,7 +88,32 @@ func (m *Module) AccountFollowingGETHandler(c *gin.Context) {
 		return
 	}
 
-	following, errWithCode := m.processor.Account().FollowingGet(c.Request.Context(), authed.Account, targetAcctID)
+	// Parse limit from query string (if any).
+	limit, errWithCode := apiutil.ParseLimit(
+		c.Query("limit"),
+		40,
+		100,
+		2,
+	)
+	if err != nil {
+		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
+		return
+	}
+
+	// Fetch following for the provided target account `as` auth.
+	following, errWithCode := m.processor.Account().FollowingGet(
+		c.Request.Context(),
+		authed.Account,
+		targetAcctID,
+		&paging.Pager{
+			// Query provided paging values,
+			// it's okay for these to be empty.
+			SinceID: c.Query("since_id"),
+			MinID:   c.Query("min_id"),
+			MaxID:   c.Query("max_id"),
+			Limit:   limit,
+		},
+	)
 	if errWithCode != nil {
 		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
 		return
