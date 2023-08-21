@@ -22,7 +22,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,14 +30,16 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
+	"github.com/superseriousbusiness/gotosocial/internal/api/model"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
+	"github.com/superseriousbusiness/gotosocial/internal/id"
 )
 
 type GetTestSuite struct {
 	FollowRequestStandardTestSuite
 }
 
-func (suite *GetTestSuite) TestGet() {
+func (suite *GetTestSuite) TestGetAll() {
 	requestingAccount := suite.testAccounts["remote_account_2"]
 	targetAccount := suite.testAccounts["local_account_1"]
 
@@ -68,7 +70,7 @@ func (suite *GetTestSuite) TestGet() {
 	defer result.Body.Close()
 
 	// check the response
-	b, err := ioutil.ReadAll(result.Body)
+	b, err := io.ReadAll(result.Body)
 	assert.NoError(suite.T(), err)
 	dst := new(bytes.Buffer)
 	err = json.Indent(dst, b, "", "  ")
@@ -97,6 +99,116 @@ func (suite *GetTestSuite) TestGet() {
     "fields": []
   }
 ]`, dst.String())
+}
+
+func (suite *GetTestSuite) TestGetPaged() {
+	var targetAccounts []*gtsmodel.Account
+
+	requestingAccount := suite.testAccounts["local_account_1"]
+
+	for _, targetAccount := range suite.testAccounts {
+		if targetAccount.ID == requestingAccount.ID {
+			// we cannot be our own target...
+			continue
+		}
+
+		// Ensure no follow request already exists.
+		_ = suite.db.DeleteFollowRequest(
+			context.Background(),
+			requestingAccount.ID,
+			targetAccount.ID,
+		)
+
+		// Generate new ID
+		id := id.NewULID()
+
+		// put a follow request in the database
+		fr := &gtsmodel.FollowRequest{
+			ID:              id,
+			CreatedAt:       time.Now(),
+			UpdatedAt:       time.Now(),
+			URI:             fmt.Sprintf("%s/follow/%s", targetAccount.URI, id),
+			AccountID:       targetAccount.ID,
+			TargetAccountID: requestingAccount.ID,
+		}
+		err := suite.db.Put(context.Background(), fr)
+		suite.NoError(err)
+
+		// Add target to account slice
+		targetAccounts = append(targetAccounts, targetAccount)
+	}
+
+	const limit = 2
+	const limitStr = "2"
+
+	// How many rounds of pages to check.
+	rounds := len(targetAccounts) / limit
+
+	// NOTE:
+	// we order our follow request account IDs by the age of
+	// the follow request, so the order of targetAccounts should
+	// be the same order we get them from the API endpoint.
+	//
+	// Further NOTE:
+	// we don't actually bother setting maxID in this test.
+	var sinceID, maxID string
+
+	for i := 0; i < rounds; i++ {
+		recorder := httptest.NewRecorder()
+		ctx := suite.newContext(recorder, http.MethodGet, []byte{}, "/api/v1/follow_requests", "")
+
+		// Update request query to add paging.
+		query := ctx.Request.URL.Query()
+		query.Set("since_id", sinceID)
+		query.Set("max_id", maxID)
+		query.Set("limit", limitStr)
+		ctx.Request.URL.RawQuery = query.Encode()
+
+		// call the handler
+		suite.followRequestModule.FollowRequestGETHandler(ctx)
+
+		// 1. we should have OK because our request was valid
+		suite.Equal(http.StatusOK, recorder.Code)
+
+		// 2. we should have no error message in the result body
+		result := recorder.Result()
+		defer result.Body.Close()
+
+		var accounts []model.Account
+
+		// Decode response body into API account models
+		dec := json.NewDecoder(result.Body)
+		err := dec.Decode(&accounts)
+		suite.NoError(err)
+		_ = result.Body.Close()
+
+		if len(accounts) != limit && len(targetAccounts) > limit {
+			// This indicates we've been served less accounts than 'limit'
+			// but we haven't reached the end of our expected targetAccounts.
+			suite.T().Errorf("incorrect number of returned accounts: %+v", accounts)
+		}
+
+		// Expected number of accounts returned.
+		expectLen := limit
+		if expectLen > len(targetAccounts) {
+			expectLen = len(targetAccounts)
+		}
+
+		// Take a slice of expected accounts,
+		// drop these now from targetAccounts.
+		expect := targetAccounts[:expectLen]
+		targetAccounts = targetAccounts[expectLen:]
+
+		for j := range expect {
+			if expect[j].ID != accounts[j].ID {
+				suite.T().Errorf("unexpected account at position in paged response: page=%d accounts=%+v", i, accounts)
+				break
+			}
+		}
+
+		// Set the next sinceID from last account.
+		sinceID = accounts[len(accounts)-1].ID
+	}
 }
 
 func TestGetTestSuite(t *testing.T) {
