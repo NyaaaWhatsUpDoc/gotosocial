@@ -148,7 +148,7 @@ func (p *Processor) FollowRemove(ctx context.Context, requestingAccount *gtsmode
 	return p.RelationshipGet(ctx, requestingAccount, targetAccountID)
 }
 
-// FollowRequestAccept ...
+// FollowRequestAccept handles the accepting of a follow request from the sourceAccountID to the requestingAccount (the currently authorized account).
 func (p *Processor) FollowRequestAccept(ctx context.Context, requestingAccount *gtsmodel.Account, sourceAccountID string) (*apimodel.Relationship, gtserror.WithCode) {
 	follow, err := p.state.DB.AcceptFollowRequest(ctx, sourceAccountID, requestingAccount.ID)
 	if err != nil {
@@ -170,7 +170,7 @@ func (p *Processor) FollowRequestAccept(ctx context.Context, requestingAccount *
 	return p.RelationshipGet(ctx, requestingAccount, sourceAccountID)
 }
 
-// FollowRequestReject ...
+// FollowRequestReject handles the rejection of a follow request from the sourceAccountID to the requestingAccount (the currently authorized account).
 func (p *Processor) FollowRequestReject(ctx context.Context, requestingAccount *gtsmodel.Account, sourceAccountID string) (*apimodel.Relationship, gtserror.WithCode) {
 	followRequest, err := p.state.DB.GetFollowRequest(ctx, sourceAccountID, requestingAccount.ID)
 	if err != nil {

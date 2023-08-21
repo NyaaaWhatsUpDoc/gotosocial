@@ -73,7 +73,7 @@ func (p *Processor) FollowingGet(ctx context.Context, requestingAccount *gtsmode
 	return p.targetAccountsFromFollows(ctx, follows, requestingAccount.ID)
 }
 
-// FollowRequestsGet ...
+// FollowRequestsGet fetches a list of the accounts that are follow requesting the given requestingAccount (the currently authorized account).
 func (p *Processor) FollowRequestsGet(ctx context.Context, requestingAccount *gtsmodel.Account, page *paging.Pager) ([]apimodel.Account, gtserror.WithCode) {
 	followRequests, err := p.state.DB.GetAccountFollowRequests(ctx, requestingAccount.ID, page)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
