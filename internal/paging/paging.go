@@ -17,7 +17,13 @@
 
 package paging
 
-import "golang.org/x/exp/slices"
+import (
+	"net/url"
+	"strconv"
+	"strings"
+
+	"golang.org/x/exp/slices"
+)
 
 // Pager provides a means of paging serialized IDs,
 // using the terminology of our API endpoint queries.
@@ -42,6 +48,40 @@ type Pager struct {
 	// Limit will limit the returned
 	// page of IDs to at most 'limit'.
 	Limit int
+}
+
+// Next creates a new Pager instance for the next returnable page,
+// using the provided min and max ID values, based on the receiving
+// previous page. Maintaining limit, and original use of since_id / min_id.
+func (p *Pager) Next(minID, maxID string) *Pager {
+	if minID == "" && maxID == "" {
+		return nil // no paging to do
+	}
+
+	if p == nil {
+		// No previous pager
+		return &Pager{
+			MinID: minID,
+			MaxID: maxID,
+		}
+	}
+
+	// Create a copy.
+	p2 := new(Pager)
+	*p2 = *p
+
+	// Prefer using "min_id"
+	// over using "since_id".
+	if p2.MinID != "" {
+		p2.MinID = minID
+	} else {
+		p2.SinceID = minID
+	}
+
+	// Set "max_id".
+	p2.MaxID = maxID
+
+	return p2
 }
 
 // Page will page the given slice of GoToSocial IDs according
@@ -224,4 +264,87 @@ func (p *Pager) PageDesc(ids []string) []string {
 	}
 
 	return ids
+}
+
+// NextLink will build a next page link string to use for given host configuration and extra query parameters.
+func (p *Pager) NextLink(proto, host, path string, queryParams []string) string {
+	if p == nil {
+		return ""
+	}
+
+	var (
+		maxIDKey = "max_id"
+		maxIDVal = p.MaxID
+	)
+
+	return buildLink(
+		proto,
+		host,
+		path,
+		maxIDKey,
+		maxIDVal,
+		p.Limit,
+		queryParams,
+	)
+}
+
+// PrevLink will build a previous page link string to use for given host configuration and extra query parameters.
+func (p *Pager) PrevLink(proto, host, path string, queryParams []string) string {
+	if p == nil {
+		return ""
+	}
+
+	var (
+		minIDKey string
+		minIDVal string
+	)
+
+	switch {
+	// Use "min_id" minimum
+	case p.MinID != "":
+		minIDKey = "min_id"
+		minIDVal = p.MinID
+
+	// Use "since_id" minimum
+	case p.SinceID != "":
+		minIDKey = "since_id"
+		minIDVal = p.SinceID
+	}
+
+	return buildLink(
+		proto,
+		host,
+		path,
+		minIDKey,
+		minIDVal,
+		p.Limit,
+		queryParams,
+	)
+}
+
+// buildLink will build a next / previous link for use in a pageable response.
+func buildLink(proto, host, path, idKey, idVal string, limit int, queryParams []string) string {
+	if idVal == "" {
+		// No paging to do.
+		return ""
+	}
+
+	// Append the `idKey=idValue` to query params.
+	queryParams = append(queryParams, idKey+"="+idVal)
+
+	if limit > 0 {
+		// Build limit query parameter.
+		param := "limit=" + strconv.Itoa(limit)
+
+		// Append `limit=$value` query parameter.
+		queryParams = append(queryParams, param)
+	}
+
+	// Build URL string.
+	return (&url.URL{
+		Scheme:   proto,
+		Host:     host,
+		Path:     path,
+		RawQuery: strings.Join(queryParams, "&"),
+	}).String()
 }
