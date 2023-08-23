@@ -33,7 +33,8 @@ import (
 type ResponseParams struct {
 	Items []interface{} // Sorted slice of items (statuses, notifications, etc)
 	Path  string        // path to use for next/prev queries in the link header
-	Page  *Pager        // page details including min / max ID values and limit
+	Next  *Pager        // page details for the next page
+	Prev  *Pager        // page details for the previous page
 	Query []string      // any extra query parameters to provide in the link header, should be in the format 'example=value'
 }
 
@@ -47,20 +48,20 @@ func PackageResponse(params ResponseParams) *apimodel.PageableResponse {
 	}
 
 	var (
-		// shorter var name :)
-		page = params.Page
+		nextPg = params.Next
+		prevPg = params.Prev
 
-		// Host application configuration.
+		// Host app configuration.
 		proto = config.GetProtocol()
 		host  = config.GetHost()
 
-		// Combined link header parts of next+prev pages.
+		// Combined next/prev page link header parts.
 		linkHdrParts = make([]string, 0, 2)
 	)
 
 	// Build the next / previous page links from page and host config.
-	nextLink := page.NextLink(proto, host, params.Path, params.Query)
-	prevLink := page.PrevLink(proto, host, params.Path, params.Query)
+	nextLink := nextPg.NextLink(proto, host, params.Path, params.Query)
+	prevLink := prevPg.PrevLink(proto, host, params.Path, params.Query)
 
 	if nextLink != "" {
 		// Append page "next" link to header parts.

@@ -35,11 +35,8 @@ func (suite *PagingSuite) TestPagingStandard() {
 	params := paging.ResponseParams{
 		Items: make([]interface{}, 10, 10),
 		Path:  "/api/v1/accounts/01H11KA68PM4NNYJEG0FJQ90R3/statuses",
-		Page: &paging.Pager{
-			MaxID: "01H11KA1DM2VH3747YDE7FV5HN",
-			MinID: "01H11KBBVRRDYYC5KEPME1NP5R",
-			Limit: 10,
-		},
+		Next:  paging.NextPage("01H11KA1DM2VH3747YDE7FV5HN", 10),
+		Prev:  paging.PrevPage("01H11KBBVRRDYYC5KEPME1NP5R", 10),
 	}
 
 	resp := paging.PackageResponse(params)
@@ -56,10 +53,8 @@ func (suite *PagingSuite) TestPagingNoLimit() {
 	params := paging.ResponseParams{
 		Items: make([]interface{}, 10, 10),
 		Path:  "/api/v1/accounts/01H11KA68PM4NNYJEG0FJQ90R3/statuses",
-		Page: &paging.Pager{
-			MaxID: "01H11KA1DM2VH3747YDE7FV5HN",
-			MinID: "01H11KBBVRRDYYC5KEPME1NP5R",
-		},
+		Next:  paging.NextPage("01H11KA1DM2VH3747YDE7FV5HN", 0),
+		Prev:  paging.PrevPage("01H11KBBVRRDYYC5KEPME1NP5R", 0),
 	}
 
 	resp := paging.PackageResponse(params)
@@ -76,10 +71,7 @@ func (suite *PagingSuite) TestPagingNoNextID() {
 	params := paging.ResponseParams{
 		Items: make([]interface{}, 10, 10),
 		Path:  "/api/v1/accounts/01H11KA68PM4NNYJEG0FJQ90R3/statuses",
-		Page: &paging.Pager{
-			MinID: "01H11KBBVRRDYYC5KEPME1NP5R",
-			Limit: 10,
-		},
+		Prev:  paging.PrevPage("01H11KBBVRRDYYC5KEPME1NP5R", 10),
 	}
 
 	resp := paging.PackageResponse(params)
@@ -96,10 +88,7 @@ func (suite *PagingSuite) TestPagingNoPrevID() {
 	params := paging.ResponseParams{
 		Items: make([]interface{}, 10, 10),
 		Path:  "/api/v1/accounts/01H11KA68PM4NNYJEG0FJQ90R3/statuses",
-		Page: &paging.Pager{
-			MaxID: "01H11KA1DM2VH3747YDE7FV5HN",
-			Limit: 10,
-		},
+		Next:  paging.NextPage("01H11KA1DM2VH3747YDE7FV5HN", 10),
 	}
 
 	resp := paging.PackageResponse(params)
@@ -114,11 +103,8 @@ func (suite *PagingSuite) TestPagingNoItems() {
 	config.SetHost("example.org")
 
 	params := paging.ResponseParams{
-		Page: &paging.Pager{
-			MaxID: "01H11KA1DM2VH3747YDE7FV5HN",
-			MinID: "01H11KBBVRRDYYC5KEPME1NP5R",
-			Limit: 10,
-		},
+		Next: paging.NextPage("01H11KA1DM2VH3747YDE7FV5HN", 10),
+		Prev: paging.PrevPage("01H11KBBVRRDYYC5KEPME1NP5R", 10),
 	}
 
 	resp := paging.PackageResponse(params)

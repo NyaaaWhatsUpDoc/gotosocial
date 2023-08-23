@@ -50,36 +50,64 @@ type Pager struct {
 	Limit int
 }
 
+func NextPage(maxID string, limit int) *Pager {
+	return &Pager{MaxID: maxID, Limit: limit}
+}
+
+func PrevPage(minID string, limit int) *Pager {
+	return &Pager{MinID: minID, Limit: limit}
+}
+
 // Next creates a new Pager instance for the next returnable page,
-// using the provided min and max ID values, based on the receiving
-// previous page. Maintaining limit, and original use of since_id / min_id.
-func (p *Pager) Next(minID, maxID string) *Pager {
-	if minID == "" && maxID == "" {
+// using given max ID value. This preserves original limit value.
+func (p *Pager) Next(maxID string) *Pager {
+	if maxID == "" {
 		return nil // no paging to do
 	}
 
 	if p == nil {
-		// No previous pager
-		return &Pager{
-			MinID: minID,
-			MaxID: maxID,
-		}
+		// No previous page given.
+		return &Pager{MaxID: maxID}
 	}
 
-	// Create a copy.
+	// Create new page.
 	p2 := new(Pager)
-	*p2 = *p
 
-	// Prefer using "min_id"
-	// over using "since_id".
-	if p2.MinID != "" {
-		p2.MinID = minID
-	} else {
-		p2.SinceID = minID
-	}
+	// Set original limit.
+	p2.Limit = p.Limit
 
 	// Set "max_id".
 	p2.MaxID = maxID
+
+	return p2
+}
+
+// Prev creates a new Pager instance for the prev returnable page, using
+// given min ID value. This preserves original limit value and min ID keying.
+func (p *Pager) Prev(minID string) *Pager {
+	if minID == "" {
+		// no paging.
+		return nil
+	}
+
+	if p == nil {
+		// No previous page given.
+		return &Pager{MinID: minID}
+	}
+
+	// Create new page.
+	p2 := new(Pager)
+
+	// Set original limit.
+	p2.Limit = p.Limit
+
+	// Set minID based on prev
+	// which min type was used.
+	if p.SinceID != "" {
+		p2.SinceID = minID
+	} else {
+		p2.MinID = minID
+	}
 
 	return p2
 }
