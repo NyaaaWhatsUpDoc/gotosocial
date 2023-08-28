@@ -27,6 +27,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/util"
 )
 
@@ -47,12 +48,26 @@ func (m *Manager) RefetchEmojis(ctx context.Context, domain string, dereferenceM
 	var (
 		maxShortcodeDomain string
 		refetchIDs         []string
+
+		page = paging.Page[string]{
+			// select max 20 at a time
+			Limit: 20,
+		}
 	)
 
 	// page through emojis 20 at a time, looking for those with missing images
 	for {
 		// Fetch next block of emojis from database
-		emojis, err := m.state.DB.GetEmojisBy(ctx, domain, false, true, "", maxShortcodeDomain, "", 20)
+		emojis, err := m.state.DB.GetEmojisBy(ctx,
+			domain,
+			false,
+			true,
+			"",
+
+			// Set next page with next max
+			// shortcode@domain and limit.
+			page.Next(maxShortcodeDomain),
+		)
 		if err != nil {
 			if !errors.Is(err, db.ErrNoEntries) {
 				// an actual error has occurred

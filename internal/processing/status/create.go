@@ -94,7 +94,7 @@ func (p *Processor) Create(ctx context.Context, account *gtsmodel.Account, appli
 		OriginAccount:  account,
 	})
 
-	return p.apiStatus(ctx, newStatus, account)
+	return p.c.GetAPIStatus(ctx, account, newStatus)
 }
 
 func processReplyToID(ctx context.Context, dbService db.DB, form *apimodel.AdvancedStatusCreateForm, thisAccountID string, status *gtsmodel.Status) gtserror.WithCode {

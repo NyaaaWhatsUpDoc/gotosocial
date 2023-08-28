@@ -112,10 +112,11 @@ func (m *Module) BlocksGETHandler(c *gin.Context) {
 	resp, errWithCode := m.processor.BlocksGet(
 		c.Request.Context(),
 		authed.Account,
-		paging.Pager{
-			SinceID: c.Query(SinceIDKey),
-			MaxID:   c.Query(MaxIDKey),
-			Limit:   limit,
+		&paging.Page[string]{
+			// Query provided paging values (note they may be empty).
+			Min:   paging.MinID(c.Query("min_id"), c.Query("since_id")),
+			Max:   paging.MaxID(c.Query("max_id")),
+			Limit: limit,
 		},
 	)
 	if errWithCode != nil {
@@ -124,6 +125,7 @@ func (m *Module) BlocksGETHandler(c *gin.Context) {
 	}
 
 	if resp.LinkHeader != "" {
+		// Add paging link header if found.
 		c.Header("Link", resp.LinkHeader)
 	}
 

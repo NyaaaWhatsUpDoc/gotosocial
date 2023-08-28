@@ -34,7 +34,7 @@ import (
 
 // FollowCreate handles a follow request to an account, either remote or local.
 func (p *Processor) FollowCreate(ctx context.Context, requestingAccount *gtsmodel.Account, form *apimodel.AccountFollowRequest) (*apimodel.Relationship, gtserror.WithCode) {
-	targetAccount, errWithCode := p.getFollowTarget(ctx, requestingAccount.ID, form.ID)
+	targetAccount, errWithCode := p.getFollowTarget(ctx, requestingAccount, form.ID)
 	if errWithCode != nil {
 		return nil, errWithCode
 	}
@@ -131,7 +131,7 @@ func (p *Processor) FollowCreate(ctx context.Context, requestingAccount *gtsmode
 
 // FollowRemove handles the removal of a follow/follow request to an account, either remote or local.
 func (p *Processor) FollowRemove(ctx context.Context, requestingAccount *gtsmodel.Account, targetAccountID string) (*apimodel.Relationship, gtserror.WithCode) {
-	targetAccount, errWithCode := p.getFollowTarget(ctx, requestingAccount.ID, targetAccountID)
+	targetAccount, errWithCode := p.getFollowTarget(ctx, requestingAccount, targetAccountID)
 	if errWithCode != nil {
 		return nil, errWithCode
 	}
@@ -146,55 +146,6 @@ func (p *Processor) FollowRemove(ctx context.Context, requestingAccount *gtsmode
 	p.state.Workers.EnqueueClientAPI(ctx, msgs...)
 
 	return p.RelationshipGet(ctx, requestingAccount, targetAccountID)
-}
-
-// FollowRequestAccept handles the accepting of a follow request from the sourceAccountID to the requestingAccount (the currently authorized account).
-func (p *Processor) FollowRequestAccept(ctx context.Context, requestingAccount *gtsmodel.Account, sourceAccountID string) (*apimodel.Relationship, gtserror.WithCode) {
-	follow, err := p.state.DB.AcceptFollowRequest(ctx, sourceAccountID, requestingAccount.ID)
-	if err != nil {
-		return nil, gtserror.NewErrorNotFound(err)
-	}
-
-	if follow.Account != nil {
-		// Only enqueue work in the case we have a request creating account stored.
-		// NOTE: due to how AcceptFollowRequest works, the inverse shouldn't be possible.
-		p.state.Workers.EnqueueClientAPI(ctx, messages.FromClientAPI{
-			APObjectType:   ap.ActivityFollow,
-			APActivityType: ap.ActivityAccept,
-			GTSModel:       follow,
-			OriginAccount:  follow.Account,
-			TargetAccount:  follow.TargetAccount,
-		})
-	}
-
-	return p.RelationshipGet(ctx, requestingAccount, sourceAccountID)
-}
-
-// FollowRequestReject handles the rejection of a follow request from the sourceAccountID to the requestingAccount (the currently authorized account).
-func (p *Processor) FollowRequestReject(ctx context.Context, requestingAccount *gtsmodel.Account, sourceAccountID string) (*apimodel.Relationship, gtserror.WithCode) {
-	followRequest, err := p.state.DB.GetFollowRequest(ctx, sourceAccountID, requestingAccount.ID)
-	if err != nil {
-		return nil, gtserror.NewErrorNotFound(err)
-	}
-
-	err = p.state.DB.RejectFollowRequest(ctx, sourceAccountID, requestingAccount.ID)
-	if err != nil {
-		return nil, gtserror.NewErrorNotFound(err)
-	}
-
-	if followRequest.Account != nil {
-		// Only enqueue work in the case we have a request creating account stored.
-		// NOTE: due to how GetFollowRequest works, the inverse shouldn't be possible.
-		p.state.Workers.EnqueueClientAPI(ctx, messages.FromClientAPI{
-			APObjectType:   ap.ActivityFollow,
-			APActivityType: ap.ActivityReject,
-			GTSModel:       followRequest,
-			OriginAccount:  followRequest.Account,
-			TargetAccount:  followRequest.TargetAccount,
-		})
-	}
-
-	return p.RelationshipGet(ctx, requestingAccount, sourceAccountID)
 }
 
 /*
@@ -248,38 +199,23 @@ func (p *Processor) updateFollow(
 
 // getFollowTarget is a convenience function which:
 //   - Checks if account is trying to follow/unfollow itself.
-//   - Returns not found if there's a block in place between accounts.
+//   - Returns not found if target should not be visible to requester.
 //   - Returns target account according to its id.
-func (p *Processor) getFollowTarget(ctx context.Context, requestingAccountID string, targetAccountID string) (*gtsmodel.Account, gtserror.WithCode) {
+func (p *Processor) getFollowTarget(ctx context.Context, requester *gtsmodel.Account, targetID string) (*gtsmodel.Account, gtserror.WithCode) {
+	// Check for requester.
+	if requester == nil {
+		err := errors.New("no authorized user")
+		return nil, gtserror.NewErrorUnauthorized(err)
+	}
+
 	// Account can't follow or unfollow itself.
-	if requestingAccountID == targetAccountID {
+	if requester.ID == targetID {
 		err := errors.New("account can't follow or unfollow itself")
 		return nil, gtserror.NewErrorNotAcceptable(err)
 	}
 
-	// Do nothing if a block exists in either direction between accounts.
-	if blocked, err := p.state.DB.IsEitherBlocked(ctx, requestingAccountID, targetAccountID); err != nil {
-		err = gtserror.Newf("db error checking block between accounts: %w", err)
-		return nil, gtserror.NewErrorInternalError(err)
-	} else if blocked {
-		err = errors.New("block exists between accounts")
-		return nil, gtserror.NewErrorNotFound(err)
-	}
-
-	// Ensure target account retrievable.
-	targetAccount, err := p.state.DB.GetAccountByID(ctx, targetAccountID)
-	if err != nil {
-		if !errors.Is(err, db.ErrNoEntries) {
-			// Real db error.
-			err = gtserror.Newf("db error looking for target account %s: %w", targetAccountID, err)
-			return nil, gtserror.NewErrorInternalError(err)
-		}
-		// Account not found.
-		err = gtserror.Newf("target account %s not found in the db", targetAccountID)
-		return nil, gtserror.NewErrorNotFound(err, err.Error())
-	}
-
-	return targetAccount, nil
+	// Fetch the target account for requesting user account.
+	return p.c.GetVisibleTargetAccount(ctx, requester, targetID)
 }
 
 // unfollow is a convenience function for having requesting account

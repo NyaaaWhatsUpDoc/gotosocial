@@ -28,11 +28,11 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
-	"github.com/superseriousbusiness/gotosocial/internal/util"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
-func (p *Processor) NotificationsGet(ctx context.Context, authed *oauth.Auth, maxID string, sinceID string, minID string, limit int, excludeTypes []string) (*apimodel.PageableResponse, gtserror.WithCode) {
-	notifs, err := p.state.DB.GetAccountNotifications(ctx, authed.Account.ID, maxID, sinceID, minID, limit, excludeTypes)
+func (p *Processor) NotificationsGet(ctx context.Context, authed *oauth.Auth, page *paging.Page[string], excludeTypes []string) (*apimodel.PageableResponse, gtserror.WithCode) {
+	notifs, err := p.state.DB.GetAccountNotifications(ctx, authed.Account.ID, page, excludeTypes)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
 		err = fmt.Errorf("NotificationsGet: db error getting notifications: %w", err)
 		return nil, gtserror.NewErrorInternalError(err)
@@ -40,7 +40,7 @@ func (p *Processor) NotificationsGet(ctx context.Context, authed *oauth.Auth, ma
 
 	count := len(notifs)
 	if count == 0 {
-		return util.EmptyPageableResponse(), nil
+		return paging.EmptyResponse(), nil
 	}
 
 	var (
@@ -96,13 +96,12 @@ func (p *Processor) NotificationsGet(ctx context.Context, authed *oauth.Auth, ma
 		items = append(items, item)
 	}
 
-	return util.PackagePageableResponse(util.PageableResponseParams{
-		Items:          items,
-		Path:           "api/v1/notifications",
-		NextMaxIDValue: nextMaxIDValue,
-		PrevMinIDValue: prevMinIDValue,
-		Limit:          limit,
-	})
+	return paging.PackageResponse(paging.ResponseParams[string]{
+		Items: items,
+		Path:  "api/v1/notifications",
+		Next:  page.Next(nextMaxIDValue),
+		Prev:  page.Prev(prevMinIDValue),
+	}), nil
 }
 
 func (p *Processor) NotificationGet(ctx context.Context, account *gtsmodel.Account, targetNotifID string) (*apimodel.Notification, gtserror.WithCode) {

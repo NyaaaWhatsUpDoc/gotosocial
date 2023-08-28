@@ -18,14 +18,13 @@
 package notifications
 
 import (
-	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	apiutil "github.com/superseriousbusiness/gotosocial/internal/api/util"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // NotificationsGETHandler swagger:operation GET /api/v1/notifications notifications
@@ -126,25 +125,27 @@ func (m *Module) NotificationsGETHandler(c *gin.Context) {
 		return
 	}
 
-	limit := 20
-	limitString := c.Query(LimitKey)
-	if limitString != "" {
-		i, err := strconv.ParseInt(limitString, 10, 32)
-		if err != nil {
-			err := fmt.Errorf("error parsing %s: %s", LimitKey, err)
-			apiutil.ErrorHandler(c, gtserror.NewErrorBadRequest(err, err.Error()), m.processor.InstanceGetV1)
-			return
-		}
-		limit = int(i)
+	// Parse limit from query string (if any).
+	limit, errWithCode := apiutil.ParseLimit(
+		c.Query("limit"),
+		20,
+		100,
+		2,
+	)
+	if errWithCode != nil {
+		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
+		return
 	}
 
 	resp, errWithCode := m.processor.Timeline().NotificationsGet(
 		c.Request.Context(),
 		authed,
-		c.Query(MaxIDKey),
-		c.Query(SinceIDKey),
-		c.Query(MinIDKey),
-		limit,
+		&paging.Page[string]{
+			// Query provided paging values (note they may be empty).
+			Min:   paging.MinID(c.Query("min_id"), c.Query("since_id")),
+			Max:   paging.MaxID(c.Query("max_id")),
+			Limit: limit,
+		},
 		c.QueryArray(ExcludeTypesKey),
 	)
 	if errWithCode != nil {
@@ -153,7 +154,9 @@ func (m *Module) NotificationsGETHandler(c *gin.Context) {
 	}
 
 	if resp.LinkHeader != "" {
+		// Add paging link header if found.
 		c.Header("Link", resp.LinkHeader)
 	}
+
 	c.JSON(http.StatusOK, resp.Items)
 }

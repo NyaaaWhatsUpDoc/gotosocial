@@ -30,18 +30,18 @@ import (
 //
 // The other values are all used to create the Link header so that callers know
 // which endpoint to query next and previously in order to do paging.
-type ResponseParams struct {
+type ResponseParams[T comparable] struct {
 	Items []interface{} // Sorted slice of items (statuses, notifications, etc)
 	Path  string        // path to use for next/prev queries in the link header
-	Next  *Pager        // page details for the next page
-	Prev  *Pager        // page details for the previous page
+	Next  *Page[T]      // page details for the next page
+	Prev  *Page[T]      // page details for the previous page
 	Query []string      // any extra query parameters to provide in the link header, should be in the format 'example=value'
 }
 
 // PackageResponse is a convenience function for returning
 // a bunch of pageable items (notifications, statuses, etc), as well
 // as a Link header to inform callers of where to find next/prev items.
-func PackageResponse(params ResponseParams) *apimodel.PageableResponse {
+func PackageResponse[T comparable](params ResponseParams[T]) *apimodel.PageableResponse {
 	if len(params.Items) == 0 {
 		// No items to page through.
 		return EmptyResponse()
@@ -56,28 +56,28 @@ func PackageResponse(params ResponseParams) *apimodel.PageableResponse {
 		host  = config.GetHost()
 
 		// Combined next/prev page link header parts.
-		linkHdrParts = make([]string, 0, 2)
+		linkHeaderParts = make([]string, 0, 2)
 	)
 
 	// Build the next / previous page links from page and host config.
-	nextLink := nextPg.NextLink(proto, host, params.Path, params.Query)
-	prevLink := prevPg.PrevLink(proto, host, params.Path, params.Query)
+	nextLink := nextPg.ToLink(proto, host, params.Path, params.Query)
+	prevLink := prevPg.ToLink(proto, host, params.Path, params.Query)
 
 	if nextLink != "" {
 		// Append page "next" link to header parts.
-		linkHdrParts = append(linkHdrParts, `<`+nextLink+`>; rel="next"`)
+		linkHeaderParts = append(linkHeaderParts, `<`+nextLink+`>; rel="next"`)
 	}
 
 	if prevLink != "" {
 		// Append page "prev" link to header parts.
-		linkHdrParts = append(linkHdrParts, `<`+prevLink+`>; rel="prev"`)
+		linkHeaderParts = append(linkHeaderParts, `<`+prevLink+`>; rel="prev"`)
 	}
 
 	return &apimodel.PageableResponse{
 		Items:      params.Items,
 		NextLink:   nextLink,
 		PrevLink:   prevLink,
-		LinkHeader: strings.Join(linkHdrParts, ", "),
+		LinkHeader: strings.Join(linkHeaderParts, ", "),
 	}
 }
 

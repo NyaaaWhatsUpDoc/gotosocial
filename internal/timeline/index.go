@@ -26,6 +26,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 func (t *timeline) indexXBetweenIDs(ctx context.Context, amount int, behindID string, beforeID string, frontToBack bool) error {
@@ -168,13 +169,13 @@ func (t *timeline) grab(ctx context.Context, amount int, behindID string, before
 		items, stop, err := t.grabFunction(
 			ctx,
 			t.timelineID,
-			maxID,
-			sinceID,
-			minID,
-			// Don't grab more than we need to.
-			amount-grabbed,
+			&paging.Page[string]{
+				Min: paging.MinID(minID, sinceID),
+				Max: paging.MaxID(maxID),
+				// Don't grab more than we need to.
+				Limit: amount - grabbed,
+			},
 		)
-
 		if err != nil {
 			// Grab function already checks for
 			// db.ErrNoEntries, so if an error

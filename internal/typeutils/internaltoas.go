@@ -34,6 +34,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/uris"
 )
 
@@ -1369,16 +1370,16 @@ the goal is to end up with something like this:
 		]
 	}
 */
-func (c *converter) StatusesToASOutboxPage(ctx context.Context, outboxID string, maxID string, minID string, statuses []*gtsmodel.Status) (vocab.ActivityStreamsOrderedCollectionPage, error) {
-	page := streams.NewActivityStreamsOrderedCollectionPage()
+func (c *converter) StatusesToASOutboxPage(ctx context.Context, outboxID string, page *paging.Page[string], statuses []*gtsmodel.Status) (vocab.ActivityStreamsOrderedCollectionPage, error) {
+	asPage := streams.NewActivityStreamsOrderedCollectionPage()
 
 	// .id
 	pageIDProp := streams.NewJSONLDIdProperty()
 	pageID := fmt.Sprintf("%s?page=true", outboxID)
-	if minID != "" {
+	if minID, _ := page.GetMin(); minID != "" {
 		pageID = fmt.Sprintf("%s&minID=%s", pageID, minID)
 	}
-	if maxID != "" {
+	if maxID, _ := page.GetMax(); maxID != "" {
 		pageID = fmt.Sprintf("%s&maxID=%s", pageID, maxID)
 	}
 	pageIDURI, err := url.Parse(pageID)
@@ -1386,7 +1387,7 @@ func (c *converter) StatusesToASOutboxPage(ctx context.Context, outboxID string,
 		return nil, err
 	}
 	pageIDProp.SetIRI(pageIDURI)
-	page.SetJSONLDId(pageIDProp)
+	asPage.SetJSONLDId(pageIDProp)
 
 	// .partOf
 	collectionIDURI, err := url.Parse(outboxID)
@@ -1395,7 +1396,7 @@ func (c *converter) StatusesToASOutboxPage(ctx context.Context, outboxID string,
 	}
 	partOfProp := streams.NewActivityStreamsPartOfProperty()
 	partOfProp.SetIRI(collectionIDURI)
-	page.SetActivityStreamsPartOf(partOfProp)
+	asPage.SetActivityStreamsPartOf(partOfProp)
 
 	// .orderedItems
 	itemsProp := streams.NewActivityStreamsOrderedItemsProperty()
@@ -1421,7 +1422,7 @@ func (c *converter) StatusesToASOutboxPage(ctx context.Context, outboxID string,
 			lowest = s.ID
 		}
 	}
-	page.SetActivityStreamsOrderedItems(itemsProp)
+	asPage.SetActivityStreamsOrderedItems(itemsProp)
 
 	// .next
 	if lowest != "" {
@@ -1432,7 +1433,7 @@ func (c *converter) StatusesToASOutboxPage(ctx context.Context, outboxID string,
 			return nil, err
 		}
 		nextProp.SetIRI(nextPropIDURI)
-		page.SetActivityStreamsNext(nextProp)
+		asPage.SetActivityStreamsNext(nextProp)
 	}
 
 	// .prev
@@ -1444,10 +1445,10 @@ func (c *converter) StatusesToASOutboxPage(ctx context.Context, outboxID string,
 			return nil, err
 		}
 		prevProp.SetIRI(prevPropIDURI)
-		page.SetActivityStreamsPrev(prevProp)
+		asPage.SetActivityStreamsPrev(prevProp)
 	}
 
-	return page, nil
+	return asPage, nil
 }
 
 /*

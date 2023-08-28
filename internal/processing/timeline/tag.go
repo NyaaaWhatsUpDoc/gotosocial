@@ -27,8 +27,8 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/text"
-	"github.com/superseriousbusiness/gotosocial/internal/util"
 )
 
 // TagTimelineGet gets a pageable timeline for the given
@@ -39,10 +39,7 @@ func (p *Processor) TagTimelineGet(
 	ctx context.Context,
 	requestingAcct *gtsmodel.Account,
 	tagName string,
-	maxID string,
-	sinceID string,
-	minID string,
-	limit int,
+	page *paging.Page[string],
 ) (*apimodel.PageableResponse, gtserror.WithCode) {
 	tag, errWithCode := p.getTag(ctx, tagName)
 	if errWithCode != nil {
@@ -55,7 +52,7 @@ func (p *Processor) TagTimelineGet(
 		return nil, gtserror.NewErrorNotFound(err, err.Error())
 	}
 
-	statuses, err := p.state.DB.GetTagTimeline(ctx, tag.ID, maxID, sinceID, minID, limit)
+	statuses, err := p.state.DB.GetTagTimeline(ctx, tag.ID, page)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
 		err = gtserror.Newf("db error getting statuses: %w", err)
 		return nil, gtserror.NewErrorInternalError(err)
@@ -65,9 +62,9 @@ func (p *Processor) TagTimelineGet(
 		ctx,
 		requestingAcct,
 		statuses,
-		limit,
 		// Use API URL for tag.
 		"/api/v1/timelines/tag/"+tagName,
+		page,
 	)
 }
 
@@ -94,12 +91,12 @@ func (p *Processor) packageTagResponse(
 	ctx context.Context,
 	requestingAcct *gtsmodel.Account,
 	statuses []*gtsmodel.Status,
-	limit int,
 	requestPath string,
+	page *paging.Page[string],
 ) (*apimodel.PageableResponse, gtserror.WithCode) {
 	count := len(statuses)
 	if count == 0 {
-		return util.EmptyPageableResponse(), nil
+		return paging.EmptyResponse(), nil
 	}
 
 	var (
@@ -131,11 +128,10 @@ func (p *Processor) packageTagResponse(
 		items = append(items, apiStatus)
 	}
 
-	return util.PackagePageableResponse(util.PageableResponseParams{
-		Items:          items,
-		Path:           requestPath,
-		NextMaxIDValue: nextMaxIDValue,
-		PrevMinIDValue: prevMinIDValue,
-		Limit:          limit,
-	})
+	return paging.PackageResponse(paging.ResponseParams[string]{
+		Items: items,
+		Path:  requestPath,
+		Next:  page.Next(nextMaxIDValue),
+		Prev:  page.Prev(prevMinIDValue),
+	}), nil
 }

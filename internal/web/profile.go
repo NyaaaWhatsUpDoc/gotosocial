@@ -30,6 +30,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/config"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 func (m *Module) profileGETHandler(c *gin.Context) {
@@ -116,30 +117,42 @@ func (m *Module) profileGETHandler(c *gin.Context) {
 		robotsMeta = robotsMetaAllowSome
 	}
 
-	// We need to change our response slightly if the
-	// profile visitor is paging through statuses.
 	var (
-		maxStatusID    = apiutil.ParseMaxID(c.Query(apiutil.MaxIDKey), "")
-		paging         = maxStatusID != ""
-		pinnedStatuses *apimodel.PageableResponse
+		// We need to change our response slightly if the
+		// profile visitor is paging through statuses.
+		maxStatusID = c.Query("max_id")
+		usePaging   = (maxStatusID != "")
+		statusPage  *paging.Page[string]
+
+		// account pinned statuses, only
+		// fetched if paging disabled.
+		pinnedStatuses []interface{}
 	)
 
-	if !paging {
+	if !usePaging {
 		// Client opened bare profile (from the top)
 		// so load + display pinned statuses.
-		pinnedStatuses, errWithCode = m.processor.Account().PinnedStatusesGet(ctx, authed.Account, targetAccount.ID)
+		pinnedRsp, errWithCode := m.processor.Account().PinnedStatusesGet(ctx, authed.Account, targetAccount.ID)
 		if errWithCode != nil {
 			apiutil.WebErrorHandler(c, errWithCode, instanceGet)
 			return
 		}
+
+		// Set pinned statuses from resp.
+		pinnedStatuses = pinnedRsp.Items
 	} else {
 		// Don't load pinned statuses at
 		// the top of profile while paging.
-		pinnedStatuses = new(apimodel.PageableResponse)
+		pinnedStatuses = make([]interface{}, 0)
+
+		// Create page info from max ID.
+		statusPage = &paging.Page[string]{
+			Max: paging.MaxID(maxStatusID),
+		}
 	}
 
 	// Get statuses from maxStatusID onwards (or from top if empty string).
-	statusResp, errWithCode := m.processor.Account().WebStatusesGet(ctx, targetAccount.ID, maxStatusID)
+	statusResp, errWithCode := m.processor.Account().WebStatusesGet(ctx, targetAccount.ID, statusPage)
 	if errWithCode != nil {
 		apiutil.WebErrorHandler(c, errWithCode, instanceGet)
 		return
@@ -162,8 +175,8 @@ func (m *Module) profileGETHandler(c *gin.Context) {
 		"robotsMeta":       robotsMeta,
 		"statuses":         statusResp.Items,
 		"statuses_next":    statusResp.NextLink,
-		"pinned_statuses":  pinnedStatuses.Items,
-		"show_back_to_top": paging,
+		"pinned_statuses":  pinnedStatuses,
+		"show_back_to_top": usePaging,
 		"stylesheets":      stylesheets,
 		"javascript":       []string{distPathPrefix + "/frontend.js"},
 	})

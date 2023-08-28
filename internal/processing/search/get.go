@@ -33,6 +33,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/text"
 	"github.com/superseriousbusiness/gotosocial/internal/util"
 )
@@ -62,9 +63,12 @@ func (p *Processor) Get(
 	req *apimodel.SearchRequest,
 ) (*apimodel.SearchResult, gtserror.WithCode) {
 	var (
-		maxID     = req.MaxID
-		minID     = req.MinID
-		limit     = req.Limit
+		page = paging.Page[string]{
+			Min:   paging.MinID(req.MinID, ""),
+			Max:   paging.MaxID(req.MaxID),
+			Limit: req.Limit,
+		}
+
 		offset    = req.Offset
 		query     = strings.TrimSpace(req.Query)                      // Trim trailing/leading whitespace.
 		queryType = strings.TrimSpace(strings.ToLower(req.QueryType)) // Trim trailing/leading whitespace; convert to lowercase.
@@ -100,9 +104,9 @@ func (p *Processor) Get(
 	log.
 		WithContext(ctx).
 		WithFields(kv.Fields{
-			{"maxID", maxID},
-			{"minID", minID},
-			{"limit", limit},
+			{"maxID", page.Max.Value},
+			{"minID", page.Min.Value},
+			{"limit", page.Limit},
 			{"offset", offset},
 			{"query", query},
 			{"queryType", queryType},
@@ -125,9 +129,9 @@ func (p *Processor) Get(
 	}
 
 	var (
-		foundStatuses = make([]*gtsmodel.Status, 0, limit)
-		foundAccounts = make([]*gtsmodel.Account, 0, limit)
-		foundTags     = make([]*gtsmodel.Tag, 0, limit)
+		foundStatuses = make([]*gtsmodel.Status, 0, page.Limit)
+		foundAccounts = make([]*gtsmodel.Account, 0, page.Limit)
+		foundTags     = make([]*gtsmodel.Tag, 0, page.Limit)
 		appendStatus  = func(s *gtsmodel.Status) { foundStatuses = append(foundStatuses, s) }
 		appendAccount = func(a *gtsmodel.Account) { foundAccounts = append(foundAccounts, a) }
 		appendTag     = func(t *gtsmodel.Tag) { foundTags = append(foundTags, t) }
@@ -156,9 +160,7 @@ func (p *Processor) Get(
 		keepLooking, err = p.accountsByNamestring(
 			ctx,
 			account,
-			maxID,
-			minID,
-			limit,
+			&page,
 			offset,
 			queryC,
 			resolve,
@@ -228,9 +230,7 @@ func (p *Processor) Get(
 	// searches are *much* more expensive.
 	keepLooking, err = p.hashtag(
 		ctx,
-		maxID,
-		minID,
-		limit,
+		&page,
 		offset,
 		query,
 		queryType,
@@ -267,9 +267,7 @@ func (p *Processor) Get(
 	if err := p.byText(
 		ctx,
 		account,
-		maxID,
-		minID,
-		limit,
+		&page,
 		offset,
 		query,
 		queryType,
@@ -303,9 +301,7 @@ func (p *Processor) Get(
 func (p *Processor) accountsByNamestring(
 	ctx context.Context,
 	requestingAccount *gtsmodel.Account,
-	maxID string,
-	minID string,
-	limit int,
+	page *paging.Page[string],
 	offset int,
 	query string,
 	resolve bool,
@@ -329,9 +325,7 @@ func (p *Processor) accountsByNamestring(
 		return false, p.accountsByText(
 			ctx,
 			requestingAccount.ID,
-			maxID,
-			minID,
-			limit,
+			page,
 			offset,
 			// OK to assume username is set now. Use
 			// it instead of query to omit leading '@'.
@@ -634,9 +628,7 @@ func (p *Processor) statusByURI(
 
 func (p *Processor) hashtag(
 	ctx context.Context,
-	maxID string,
-	minID string,
-	limit int,
+	page *paging.Page[string],
 	offset int,
 	query string,
 	queryType string,
@@ -685,9 +677,7 @@ func (p *Processor) hashtag(
 	tags, err := p.state.DB.SearchForTags(
 		ctx,
 		normalized,
-		maxID,
-		minID,
-		limit,
+		page,
 		offset,
 	)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
@@ -716,9 +706,7 @@ func (p *Processor) hashtag(
 func (p *Processor) byText(
 	ctx context.Context,
 	requestingAccount *gtsmodel.Account,
-	maxID string,
-	minID string,
-	limit int,
+	page *paging.Page[string],
 	offset int,
 	query string,
 	queryType string,
@@ -730,17 +718,18 @@ func (p *Processor) byText(
 		// If search type is any, ignore maxID and minID
 		// parameters, since we can't use them to page
 		// on both accounts and statuses simultaneously.
-		maxID = ""
-		minID = ""
+		p2 := new(paging.Page[string])
+		*p2 = *page
+		p2.Min.Value = ""
+		p2.Max.Value = ""
+		page = p2
 	}
 
 	if includeAccounts(queryType) {
 		// Search for accounts using the given text.
 		if err := p.accountsByText(ctx,
 			requestingAccount.ID,
-			maxID,
-			minID,
-			limit,
+			page,
 			offset,
 			query,
 			following,
@@ -754,9 +743,7 @@ func (p *Processor) byText(
 		// Search for statuses using the given text.
 		if err := p.statusesByText(ctx,
 			requestingAccount.ID,
-			maxID,
-			minID,
-			limit,
+			page,
 			offset,
 			query,
 			appendStatus,
@@ -773,9 +760,7 @@ func (p *Processor) byText(
 func (p *Processor) accountsByText(
 	ctx context.Context,
 	requestingAccountID string,
-	maxID string,
-	minID string,
-	limit int,
+	page *paging.Page[string],
 	offset int,
 	query string,
 	following bool,
@@ -784,7 +769,7 @@ func (p *Processor) accountsByText(
 	accounts, err := p.state.DB.SearchForAccounts(
 		ctx,
 		requestingAccountID,
-		query, maxID, minID, limit, following, offset)
+		query, page, following, offset)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
 		return gtserror.Newf("error checking database for accounts using text %s: %w", query, err)
 	}
@@ -801,9 +786,7 @@ func (p *Processor) accountsByText(
 func (p *Processor) statusesByText(
 	ctx context.Context,
 	requestingAccountID string,
-	maxID string,
-	minID string,
-	limit int,
+	page *paging.Page[string],
 	offset int,
 	query string,
 	appendStatus func(*gtsmodel.Status),
@@ -811,7 +794,7 @@ func (p *Processor) statusesByText(
 	statuses, err := p.state.DB.SearchForStatuses(
 		ctx,
 		requestingAccountID,
-		query, maxID, minID, limit, offset)
+		query, page, offset)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
 		return gtserror.Newf("error checking database for statuses using text %s: %w", query, err)
 	}

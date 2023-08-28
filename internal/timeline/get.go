@@ -28,6 +28,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/id"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 func (t *timeline) LastGot() time.Time {
@@ -36,7 +37,18 @@ func (t *timeline) LastGot() time.Time {
 	return t.lastGot
 }
 
-func (t *timeline) Get(ctx context.Context, amount int, maxID string, sinceID string, minID string, prepareNext bool) ([]Preparable, error) {
+func (t *timeline) Get(ctx context.Context, page *paging.Page[string], prepareNext bool) ([]Preparable, error) {
+	// Extract values from page,
+	// (this accounts for nil page).
+	//
+	// TODO: update more of this
+	// timeline code to use page directly
+	// instead of this shim-like method.
+	amount, _ := page.GetLimit()
+	maxID, _ := page.GetMax()
+	minID := getMinID(page)
+	sinceID := getSinceID(page)
+
 	l := log.WithContext(ctx).
 		WithFields(kv.Fields{
 			{"accountID", t.timelineID},
@@ -413,4 +425,26 @@ func (t *timeline) prepareNextQuery(amount int, maxID string, sinceID string, mi
 				Warnf("error preparing next query: %s", err)
 		}
 	}()
+}
+
+// getMinID extracts a `min_id` from a page, accounting for a nil page or `since_id` min boundary.
+func getMinID(page *paging.Page[string]) string {
+	if page == nil {
+		return ""
+	}
+	if page.Min.Name == "min_id" {
+		return page.Min.Value
+	}
+	return ""
+}
+
+// getSinceID extracts a `since_id` from a page, accounting for a nil page or `min_id` min boundary.
+func getSinceID(page *paging.Page[string]) string {
+	if page == nil {
+		return ""
+	}
+	if page.Min.Name == "since_id" {
+		return page.Min.Value
+	}
+	return ""
 }

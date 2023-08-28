@@ -27,7 +27,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
-	"github.com/superseriousbusiness/gotosocial/internal/util"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // Get returns the user view of a moderation report, with the given id.
@@ -59,19 +59,16 @@ func (p *Processor) GetMultiple(
 	account *gtsmodel.Account,
 	resolved *bool,
 	targetAccountID string,
-	maxID string,
-	sinceID string,
-	minID string,
-	limit int,
+	page *paging.Page[string],
 ) (*apimodel.PageableResponse, gtserror.WithCode) {
-	reports, err := p.state.DB.GetReports(ctx, resolved, account.ID, targetAccountID, maxID, sinceID, minID, limit)
+	reports, err := p.state.DB.GetReports(ctx, resolved, account.ID, targetAccountID, page)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
 	count := len(reports)
 	if count == 0 {
-		return util.EmptyPageableResponse(), nil
+		return paging.EmptyResponse(), nil
 	}
 
 	items := make([]interface{}, 0, count)
@@ -94,12 +91,10 @@ func (p *Processor) GetMultiple(
 		extraQueryParams = append(extraQueryParams, "target_account_id="+targetAccountID)
 	}
 
-	return util.PackagePageableResponse(util.PageableResponseParams{
-		Items:            items,
-		Path:             "/api/v1/reports",
-		NextMaxIDValue:   nextMaxIDValue,
-		PrevMinIDValue:   prevMinIDValue,
-		Limit:            limit,
-		ExtraQueryParams: extraQueryParams,
-	})
+	return paging.PackageResponse(paging.ResponseParams[string]{
+		Items: items,
+		Path:  "/api/v1/reports",
+		Next:  page.Next(nextMaxIDValue),
+		Prev:  page.Prev(prevMinIDValue),
+	}), nil
 }

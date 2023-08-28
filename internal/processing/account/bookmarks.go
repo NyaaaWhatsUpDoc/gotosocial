@@ -27,13 +27,13 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/id"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
-	"github.com/superseriousbusiness/gotosocial/internal/util"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // BookmarksGet returns a pageable response of statuses that are bookmarked by requestingAccount.
 // Paging for this response is done based on bookmark ID rather than status ID.
-func (p *Processor) BookmarksGet(ctx context.Context, requestingAccount *gtsmodel.Account, limit int, maxID string, minID string) (*apimodel.PageableResponse, gtserror.WithCode) {
-	bookmarks, err := p.state.DB.GetStatusBookmarks(ctx, requestingAccount.ID, limit, maxID, minID)
+func (p *Processor) BookmarksGet(ctx context.Context, requestingAccount *gtsmodel.Account, page *paging.Page[string]) (*apimodel.PageableResponse, gtserror.WithCode) {
+	bookmarks, err := p.state.DB.GetStatusBookmarks(ctx, requestingAccount.ID, page)
 	if err != nil {
 		return nil, gtserror.NewErrorInternalError(err)
 	}
@@ -88,15 +88,10 @@ func (p *Processor) BookmarksGet(ctx context.Context, requestingAccount *gtsmode
 		}
 	}
 
-	if len(items) == 0 {
-		return util.EmptyPageableResponse(), nil
-	}
-
-	return util.PackagePageableResponse(util.PageableResponseParams{
-		Items:          items,
-		Path:           "/api/v1/bookmarks",
-		NextMaxIDValue: nextMaxIDValue,
-		PrevMinIDValue: prevMinIDValue,
-		Limit:          limit,
-	})
+	return paging.PackageResponse(paging.ResponseParams[string]{
+		Items: items,
+		Path:  "/api/v1/bookmarks",
+		Next:  page.Next(nextMaxIDValue),
+		Prev:  page.Prev(prevMinIDValue),
+	}), nil
 }

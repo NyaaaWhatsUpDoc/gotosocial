@@ -27,11 +27,11 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
-	"github.com/superseriousbusiness/gotosocial/internal/util"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
-func (p *Processor) PublicTimelineGet(ctx context.Context, authed *oauth.Auth, maxID string, sinceID string, minID string, limit int, local bool) (*apimodel.PageableResponse, gtserror.WithCode) {
-	statuses, err := p.state.DB.GetPublicTimeline(ctx, maxID, sinceID, minID, limit, local)
+func (p *Processor) PublicTimelineGet(ctx context.Context, authed *oauth.Auth, page *paging.Page[string], local bool) (*apimodel.PageableResponse, gtserror.WithCode) {
+	statuses, err := p.state.DB.GetPublicTimeline(ctx, page, local)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
 		err = fmt.Errorf("PublicTimelineGet: db error getting statuses: %w", err)
 		return nil, gtserror.NewErrorInternalError(err)
@@ -39,7 +39,7 @@ func (p *Processor) PublicTimelineGet(ctx context.Context, authed *oauth.Auth, m
 
 	count := len(statuses)
 	if count == 0 {
-		return util.EmptyPageableResponse(), nil
+		return paging.EmptyResponse(), nil
 	}
 
 	var (
@@ -71,11 +71,10 @@ func (p *Processor) PublicTimelineGet(ctx context.Context, authed *oauth.Auth, m
 		items = append(items, apiStatus)
 	}
 
-	return util.PackagePageableResponse(util.PageableResponseParams{
-		Items:          items,
-		Path:           "/api/v1/timelines/public",
-		NextMaxIDValue: nextMaxIDValue,
-		PrevMinIDValue: prevMinIDValue,
-		Limit:          limit,
-	})
+	return paging.PackageResponse(paging.ResponseParams[string]{
+		Items: items,
+		Path:  "/api/v1/timelines/public",
+		Next:  page.Next(nextMaxIDValue),
+		Prev:  page.Prev(prevMinIDValue),
+	}), nil
 }

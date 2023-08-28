@@ -15,38 +15,36 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package status
+package common
 
 import (
 	"github.com/superseriousbusiness/gotosocial/internal/federation"
-	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
-	"github.com/superseriousbusiness/gotosocial/internal/processing/common"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
-	"github.com/superseriousbusiness/gotosocial/internal/text"
 	"github.com/superseriousbusiness/gotosocial/internal/typeutils"
 	"github.com/superseriousbusiness/gotosocial/internal/visibility"
 )
 
+// Processor provides a processor with logic
+// common to multiple logical domains of the
+// processing subsection of the codebase.
 type Processor struct {
-	// embedded common logic
-	c *common.Processor
-
-	state        *state.State
-	federator    federation.Federator
-	tc           typeutils.TypeConverter
-	filter       *visibility.Filter
-	formatter    text.Formatter
-	parseMention gtsmodel.ParseMentionFunc
+	state     *state.State
+	converter typeutils.TypeConverter
+	federator federation.Federator
+	filter    *visibility.Filter
 }
 
-// New returns a new status processor.
-func New(state *state.State, federator federation.Federator, tc typeutils.TypeConverter, filter *visibility.Filter, parseMention gtsmodel.ParseMentionFunc) Processor {
+// New returns a new Processor instance.
+func New(
+	state *state.State,
+	converter typeutils.TypeConverter,
+	federator federation.Federator,
+	filter *visibility.Filter,
+) Processor {
 	return Processor{
-		state:        state,
-		federator:    federator,
-		tc:           tc,
-		filter:       filter,
-		formatter:    text.NewFormatter(state.DB),
-		parseMention: parseMention,
+		state:     state,
+		converter: converter,
+		federator: federator,
+		filter:    filter,
 	}
 }

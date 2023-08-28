@@ -31,6 +31,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
 	"github.com/superseriousbusiness/gotosocial/internal/messages"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/util"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -302,6 +303,10 @@ func (p *Processor) deleteAccountStatuses(ctx context.Context, account *gtsmodel
 		err      error
 		maxID    string
 		msgs     = []messages.FromClientAPI{}
+		page     = paging.Page[string]{
+			Max:   paging.MaxID(maxID),
+			Limit: deleteSelectLimit,
+		}
 	)
 
 statusLoop:
@@ -310,11 +315,10 @@ statusLoop:
 		statuses, err = p.state.DB.GetAccountStatuses(
 			ctx,
 			account.ID,
-			deleteSelectLimit,
+			// next page from maxID
+			page.Next(maxID),
 			false,
 			false,
-			maxID,
-			"",
 			false,
 			false,
 		)

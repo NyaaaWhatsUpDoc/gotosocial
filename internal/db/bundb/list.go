@@ -28,6 +28,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
 	"github.com/uptrace/bun"
 )
@@ -136,7 +137,7 @@ func (l *listDB) PopulateList(ctx context.Context, list *gtsmodel.List) error {
 		list.ListEntries, err = l.state.DB.GetListEntries(
 			gtscontext.SetBarebones(ctx),
 			list.ID,
-			"", "", "", 0,
+			nil,
 		)
 		if err != nil {
 			errs.Appendf("error populating list entries: %w", err)
@@ -270,22 +271,19 @@ func (l *listDB) getListEntry(ctx context.Context, lookup string, dbQuery func(*
 	return listEntry, nil
 }
 
-func (l *listDB) GetListEntries(ctx context.Context,
-	listID string,
-	maxID string,
-	sinceID string,
-	minID string,
-	limit int,
-) ([]*gtsmodel.ListEntry, error) {
-	// Ensure reasonable
-	if limit < 0 {
-		limit = 0
-	}
-
-	// Make educated guess for slice size
+func (l *listDB) GetListEntries(ctx context.Context, listID string, page *paging.Page[string]) ([]*gtsmodel.ListEntry, error) {
 	var (
-		entryIDs    = make([]string, 0, limit)
-		frontToBack = true
+		// Get paging parameters.
+		minID, _ = page.GetMin()
+		maxID, _ = page.GetMax()
+		limit, _ = page.GetLimit()
+		order, _ = page.GetOrder()
+
+		// Make educated guess for slice size
+		entryIDs = make([]string, 0, limit)
+
+		// check requested return order based on paging
+		frontToBack = (order == paging.OrderAscending)
 	)
 
 	q := l.db.
@@ -301,17 +299,9 @@ func (l *listDB) GetListEntries(ctx context.Context,
 		q = q.Where("? < ?", bun.Ident("entry.id"), maxID)
 	}
 
-	if sinceID != "" {
-		// return only entries HIGHER (ie., newer) than sinceID
-		q = q.Where("? > ?", bun.Ident("entry.id"), sinceID)
-	}
-
 	if minID != "" {
-		// return only entries HIGHER (ie., newer) than minID
+		// return only entries HIGHER (ie., newer) than sinceID
 		q = q.Where("? > ?", bun.Ident("entry.id"), minID)
-
-		// page up
-		frontToBack = false
 	}
 
 	if limit > 0 {

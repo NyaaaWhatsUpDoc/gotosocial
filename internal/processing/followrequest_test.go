@@ -30,6 +30,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/testrig"
 )
 
+// TODO: move this to the "internal/processing/account" pkg
 type FollowRequestTestSuite struct {
 	ProcessingStandardTestSuite
 }

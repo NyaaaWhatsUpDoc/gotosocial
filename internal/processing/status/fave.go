@@ -28,7 +28,6 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/id"
-	"github.com/superseriousbusiness/gotosocial/internal/log"
 	"github.com/superseriousbusiness/gotosocial/internal/messages"
 	"github.com/superseriousbusiness/gotosocial/internal/uris"
 )
@@ -42,7 +41,7 @@ func (p *Processor) FaveCreate(ctx context.Context, requestingAccount *gtsmodel.
 
 	if existingFave != nil {
 		// Status is already faveed.
-		return p.apiStatus(ctx, targetStatus, requestingAccount)
+		return p.c.GetAPIStatus(ctx, requestingAccount, targetStatus)
 	}
 
 	// Create and store a new fave
@@ -72,7 +71,7 @@ func (p *Processor) FaveCreate(ctx context.Context, requestingAccount *gtsmodel.
 		TargetAccount:  targetStatus.Account,
 	})
 
-	return p.apiStatus(ctx, targetStatus, requestingAccount)
+	return p.c.GetAPIStatus(ctx, requestingAccount, targetStatus)
 }
 
 // FaveRemove removes a fave for the requesting account, targeting the given status (no-op if fave doesn't exist).
@@ -84,7 +83,7 @@ func (p *Processor) FaveRemove(ctx context.Context, requestingAccount *gtsmodel.
 
 	if existingFave == nil {
 		// Status isn't faveed.
-		return p.apiStatus(ctx, targetStatus, requestingAccount)
+		return p.c.GetAPIStatus(ctx, requestingAccount, targetStatus)
 	}
 
 	// We have a fave to remove.
@@ -102,52 +101,29 @@ func (p *Processor) FaveRemove(ctx context.Context, requestingAccount *gtsmodel.
 		TargetAccount:  targetStatus.Account,
 	})
 
-	return p.apiStatus(ctx, targetStatus, requestingAccount)
+	return p.c.GetAPIStatus(ctx, requestingAccount, targetStatus)
 }
 
 // FavedBy returns a slice of accounts that have liked the given status, filtered according to privacy settings.
 func (p *Processor) FavedBy(ctx context.Context, requestingAccount *gtsmodel.Account, targetStatusID string) ([]*apimodel.Account, gtserror.WithCode) {
-	targetStatus, errWithCode := p.getVisibleStatus(ctx, requestingAccount, targetStatusID)
+	targetStatus, errWithCode := p.c.GetVisibleTargetStatus(ctx, requestingAccount, targetStatusID)
 	if errWithCode != nil {
 		return nil, errWithCode
 	}
 
-	statusFaves, err := p.state.DB.GetStatusFaves(ctx, targetStatus.ID)
+	faves, err := p.state.DB.GetStatusFaves(ctx, targetStatus.ID)
 	if err != nil {
 		return nil, gtserror.NewErrorNotFound(fmt.Errorf("FavedBy: error seeing who faved status: %s", err))
 	}
 
-	// For each fave, ensure that we're only showing
-	// the requester accounts that they don't block,
-	// and which don't block them.
-	apiAccounts := make([]*apimodel.Account, 0, len(statusFaves))
-	for _, fave := range statusFaves {
-		if blocked, err := p.state.DB.IsEitherBlocked(ctx, requestingAccount.ID, fave.AccountID); err != nil {
-			err = fmt.Errorf("FavedBy: error checking blocks: %w", err)
-			return nil, gtserror.NewErrorInternalError(err)
-		} else if blocked {
-			continue
-		}
-
-		if fave.Account == nil {
-			// Account isn't set for some reason, just skip.
-			log.WithContext(ctx).WithField("fave", fave).Warn("fave had no associated account")
-			continue
-		}
-
-		apiAccount, err := p.tc.AccountToAPIAccountPublic(ctx, fave.Account)
-		if err != nil {
-			err = fmt.Errorf("FavedBy: error converting account %s to frontend representation: %w", fave.AccountID, err)
-			return nil, gtserror.NewErrorInternalError(err)
-		}
-		apiAccounts = append(apiAccounts, apiAccount)
-	}
-
-	return apiAccounts, nil
+	// Return a filtered slice of public API account models (this catches and logs errors).
+	return p.c.GetVisibleAPIAccounts(ctx, requestingAccount, func(i int) *gtsmodel.Account {
+		return faves[i].Account
+	}, len(faves)), nil
 }
 
 func (p *Processor) getFaveTarget(ctx context.Context, requestingAccount *gtsmodel.Account, targetStatusID string) (*gtsmodel.Status, *gtsmodel.StatusFave, gtserror.WithCode) {
-	targetStatus, errWithCode := p.getVisibleStatus(ctx, requestingAccount, targetStatusID)
+	targetStatus, errWithCode := p.c.GetVisibleTargetStatus(ctx, requestingAccount, targetStatusID)
 	if errWithCode != nil {
 		return nil, nil, errWithCode
 	}

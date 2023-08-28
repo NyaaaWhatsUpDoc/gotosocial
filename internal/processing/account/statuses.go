@@ -27,7 +27,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
-	"github.com/superseriousbusiness/gotosocial/internal/util"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // StatusesGet fetches a number of statuses (in time descending order) from the
@@ -36,25 +36,17 @@ func (p *Processor) StatusesGet(
 	ctx context.Context,
 	requestingAccount *gtsmodel.Account,
 	targetAccountID string,
-	limit int,
+	page *paging.Page[string],
 	excludeReplies bool,
 	excludeReblogs bool,
-	maxID string,
-	minID string,
 	pinned bool,
 	mediaOnly bool,
 	publicOnly bool,
 ) (*apimodel.PageableResponse, gtserror.WithCode) {
-	if requestingAccount != nil {
-		blocked, err := p.state.DB.IsEitherBlocked(ctx, requestingAccount.ID, targetAccountID)
-		if err != nil {
-			return nil, gtserror.NewErrorInternalError(err)
-		}
-
-		if blocked {
-			err := errors.New("block exists between accounts")
-			return nil, gtserror.NewErrorNotFound(err)
-		}
+	// Fetch target account to check it exists, and visibility of requester->target.
+	_, errWithCode := p.c.GetVisibleTargetAccount(ctx, requestingAccount, targetAccountID)
+	if errWithCode != nil {
+		return nil, errWithCode
 	}
 
 	var (
@@ -67,7 +59,14 @@ func (p *Processor) StatusesGet(
 		statuses, err = p.state.DB.GetAccountPinnedStatuses(ctx, targetAccountID)
 	} else {
 		// Get account statuses which *may* include pinned ones.
-		statuses, err = p.state.DB.GetAccountStatuses(ctx, targetAccountID, limit, excludeReplies, excludeReblogs, maxID, minID, mediaOnly, publicOnly)
+		statuses, err = p.state.DB.GetAccountStatuses(ctx,
+			targetAccountID,
+			page,
+			excludeReplies,
+			excludeReblogs,
+			mediaOnly,
+			publicOnly,
+		)
 	}
 
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
@@ -75,7 +74,7 @@ func (p *Processor) StatusesGet(
 	}
 
 	if len(statuses) == 0 {
-		return util.EmptyPageableResponse(), nil
+		return paging.EmptyResponse(), nil
 	}
 
 	// Filtering + serialization process is the same for
@@ -89,7 +88,7 @@ func (p *Processor) StatusesGet(
 	if count == 0 {
 		// After filtering there were
 		// no statuses left to serve.
-		return util.EmptyPageableResponse(), nil
+		return paging.EmptyResponse(), nil
 	}
 
 	var (
@@ -119,26 +118,25 @@ func (p *Processor) StatusesGet(
 		}, nil
 	}
 
-	return util.PackagePageableResponse(util.PageableResponseParams{
-		Items:          items,
-		Path:           "/api/v1/accounts/" + targetAccountID + "/statuses",
-		NextMaxIDValue: nextMaxIDValue,
-		PrevMinIDValue: prevMinIDValue,
-		Limit:          limit,
-		ExtraQueryParams: []string{
+	return paging.PackageResponse(paging.ResponseParams[string]{
+		Items: items,
+		Path:  "/api/v1/accounts/" + targetAccountID + "/statuses",
+		Next:  page.Next(nextMaxIDValue),
+		Prev:  page.Prev(prevMinIDValue),
+		Query: []string{
 			fmt.Sprintf("exclude_replies=%t", excludeReplies),
 			fmt.Sprintf("exclude_reblogs=%t", excludeReblogs),
 			fmt.Sprintf("pinned=%t", pinned),
 			fmt.Sprintf("only_media=%t", mediaOnly),
 			fmt.Sprintf("only_public=%t", publicOnly),
 		},
-	})
+	}), nil
 }
 
 // WebStatusesGet fetches a number of statuses (in descending order)
 // from the given account. It selects only statuses which are suitable
 // for showing on the public web profile of an account.
-func (p *Processor) WebStatusesGet(ctx context.Context, targetAccountID string, maxID string) (*apimodel.PageableResponse, gtserror.WithCode) {
+func (p *Processor) WebStatusesGet(ctx context.Context, targetAccountID string, page *paging.Page[string]) (*apimodel.PageableResponse, gtserror.WithCode) {
 	account, err := p.state.DB.GetAccountByID(ctx, targetAccountID)
 	if err != nil {
 		if errors.Is(err, db.ErrNoEntries) {
@@ -153,14 +151,14 @@ func (p *Processor) WebStatusesGet(ctx context.Context, targetAccountID string, 
 		return nil, gtserror.NewErrorNotFound(err)
 	}
 
-	statuses, err := p.state.DB.GetAccountWebStatuses(ctx, targetAccountID, 10, maxID)
+	statuses, err := p.state.DB.GetAccountWebStatuses(ctx, targetAccountID, page)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
 	count := len(statuses)
 	if count == 0 {
-		return util.EmptyPageableResponse(), nil
+		return paging.EmptyResponse(), nil
 	}
 
 	var (
@@ -181,15 +179,15 @@ func (p *Processor) WebStatusesGet(ctx context.Context, targetAccountID string, 
 		items = append(items, item)
 	}
 
-	return util.PackagePageableResponse(util.PageableResponseParams{
-		Items:          items,
-		Path:           "/@" + account.Username,
-		NextMaxIDValue: nextMaxIDValue,
-	})
+	return paging.PackageResponse(paging.ResponseParams[string]{
+		Items: items,
+		Path:  "/@" + account.Username,
+		Next:  page.Next(nextMaxIDValue),
+	}), nil
 }
 
 // PinnedStatusesGet is a shortcut for getting just an account's pinned statuses.
 // Under the hood, it just calls StatusesGet using mostly default parameters.
 func (p *Processor) PinnedStatusesGet(ctx context.Context, requestingAccount *gtsmodel.Account, targetAccountID string) (*apimodel.PageableResponse, gtserror.WithCode) {
-	return p.StatusesGet(ctx, requestingAccount, targetAccountID, 0, false, false, "", "", true, false, false)
+	return p.StatusesGet(ctx, requestingAccount, targetAccountID, nil, false, false, true, false, false)
 }

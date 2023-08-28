@@ -24,6 +24,7 @@ import (
 
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
 	"github.com/uptrace/bun"
 )
@@ -81,14 +82,16 @@ func (s *statusBookmarkDB) GetStatusBookmarkID(ctx context.Context, accountID st
 	return id, nil
 }
 
-func (s *statusBookmarkDB) GetStatusBookmarks(ctx context.Context, accountID string, limit int, maxID string, minID string) ([]*gtsmodel.StatusBookmark, error) {
-	// Ensure reasonable
-	if limit < 0 {
-		limit = 0
-	}
+func (s *statusBookmarkDB) GetStatusBookmarks(ctx context.Context, accountID string, page *paging.Page[string]) ([]*gtsmodel.StatusBookmark, error) {
+	var (
+		// Get paging parameters.
+		minID, _ = page.GetMin()
+		maxID, _ = page.GetMax()
+		limit, _ = page.GetLimit()
 
-	// Guess size of IDs based on limit.
-	ids := make([]string, 0, limit)
+		// Make educated guess for slice size
+		bookmarkIDs = make([]string, 0, limit)
+	)
 
 	q := s.db.
 		NewSelect().
@@ -113,13 +116,13 @@ func (s *statusBookmarkDB) GetStatusBookmarks(ctx context.Context, accountID str
 		q = q.Limit(limit)
 	}
 
-	if err := q.Scan(ctx, &ids); err != nil {
+	if err := q.Scan(ctx, &bookmarkIDs); err != nil {
 		return nil, err
 	}
 
-	bookmarks := make([]*gtsmodel.StatusBookmark, 0, len(ids))
+	bookmarks := make([]*gtsmodel.StatusBookmark, 0, len(bookmarkIDs))
 
-	for _, id := range ids {
+	for _, id := range bookmarkIDs {
 		bookmark, err := s.GetStatusBookmark(ctx, id)
 		if err != nil {
 			log.Errorf(ctx, "error getting bookmark %q: %v", id, err)

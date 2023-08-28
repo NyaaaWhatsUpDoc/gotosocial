@@ -28,6 +28,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect"
@@ -194,7 +195,7 @@ func (e *emojiDB) DeleteEmojiByID(ctx context.Context, id string) error {
 	})
 }
 
-func (e *emojiDB) GetEmojisBy(ctx context.Context, domain string, includeDisabled bool, includeEnabled bool, shortcode string, maxShortcodeDomain string, minShortcodeDomain string, limit int) ([]*gtsmodel.Emoji, error) {
+func (e *emojiDB) GetEmojisBy(ctx context.Context, domain string, includeDisabled bool, includeEnabled bool, shortcode string, page *paging.Page[string]) ([]*gtsmodel.Emoji, error) {
 	emojiIDs := []string{}
 
 	subQuery := e.db.
@@ -258,11 +259,11 @@ func (e *emojiDB) GetEmojisBy(ctx context.Context, domain string, includeDisable
 	// assume we want to sort ASC (a-z) unless informed otherwise
 	order := "ASC"
 
-	if maxShortcodeDomain != "" {
+	if maxShortcodeDomain, ok := page.GetMax(); ok {
 		subQuery = subQuery.Where("? > LOWER(?)", bun.Ident("shortcode_domain"), maxShortcodeDomain)
 	}
 
-	if minShortcodeDomain != "" {
+	if minShortcodeDomain, ok := page.GetMin(); ok {
 		subQuery = subQuery.Where("? < LOWER(?)", bun.Ident("shortcode_domain"), minShortcodeDomain)
 		// if we have a minShortcodeDomain we're paging upwards/backwards
 		order = "DESC"
@@ -270,7 +271,7 @@ func (e *emojiDB) GetEmojisBy(ctx context.Context, domain string, includeDisable
 
 	subQuery = subQuery.Order("shortcode_domain " + order)
 
-	if limit > 0 {
+	if limit, ok := page.GetLimit(); ok {
 		subQuery = subQuery.Limit(limit)
 	}
 
@@ -311,7 +312,7 @@ func (e *emojiDB) GetEmojisBy(ctx context.Context, domain string, includeDisable
 	return e.GetEmojisByIDs(ctx, emojiIDs)
 }
 
-func (e *emojiDB) GetEmojis(ctx context.Context, maxID string, limit int) ([]*gtsmodel.Emoji, error) {
+func (e *emojiDB) GetEmojis(ctx context.Context, page *paging.Page[string]) ([]*gtsmodel.Emoji, error) {
 	var emojiIDs []string
 
 	q := e.db.NewSelect().
@@ -319,11 +320,11 @@ func (e *emojiDB) GetEmojis(ctx context.Context, maxID string, limit int) ([]*gt
 		Column("id").
 		Order("id DESC")
 
-	if maxID != "" {
+	if maxID, ok := page.GetMax(); ok {
 		q = q.Where("id < ?", maxID)
 	}
 
-	if limit != 0 {
+	if limit, ok := page.GetLimit(); ok {
 		q = q.Limit(limit)
 	}
 
@@ -334,7 +335,7 @@ func (e *emojiDB) GetEmojis(ctx context.Context, maxID string, limit int) ([]*gt
 	return e.GetEmojisByIDs(ctx, emojiIDs)
 }
 
-func (e *emojiDB) GetRemoteEmojis(ctx context.Context, maxID string, limit int) ([]*gtsmodel.Emoji, error) {
+func (e *emojiDB) GetRemoteEmojis(ctx context.Context, page *paging.Page[string]) ([]*gtsmodel.Emoji, error) {
 	var emojiIDs []string
 
 	q := e.db.NewSelect().
@@ -343,11 +344,11 @@ func (e *emojiDB) GetRemoteEmojis(ctx context.Context, maxID string, limit int) 
 		Where("domain IS NOT NULL").
 		Order("id DESC")
 
-	if maxID != "" {
+	if maxID, ok := page.GetMax(); ok {
 		q = q.Where("id < ?", maxID)
 	}
 
-	if limit != 0 {
+	if limit, ok := page.GetLimit(); ok {
 		q = q.Limit(limit)
 	}
 

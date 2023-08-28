@@ -26,8 +26,8 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
-	"github.com/superseriousbusiness/gotosocial/internal/id"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
 	"github.com/superseriousbusiness/gotosocial/internal/util"
 	"github.com/uptrace/bun"
@@ -290,11 +290,9 @@ func (i *instanceDB) GetInstancePeers(ctx context.Context, includeSuspended bool
 	return instances, nil
 }
 
-func (i *instanceDB) GetInstanceAccounts(ctx context.Context, domain string, maxID string, limit int) ([]*gtsmodel.Account, error) {
-	// Ensure reasonable
-	if limit < 0 {
-		limit = 0
-	}
+func (i *instanceDB) GetInstanceAccounts(ctx context.Context, domain string, page *paging.Page[string]) ([]*gtsmodel.Account, error) {
+	// Get limit (always >= 0).
+	limit, _ := page.GetLimit()
 
 	// Normalize the domain as punycode.
 	var err error
@@ -315,10 +313,9 @@ func (i *instanceDB) GetInstanceAccounts(ctx context.Context, domain string, max
 		Where("? = ?", bun.Ident("account.domain"), domain).
 		Order("account.id DESC")
 
-	if maxID == "" {
-		maxID = id.Highest
+	if maxID, ok := page.GetMax(); ok {
+		q = q.Where("? < ?", bun.Ident("account.id"), maxID)
 	}
-	q = q.Where("? < ?", bun.Ident("account.id"), maxID)
 
 	if limit > 0 {
 		q = q.Limit(limit)

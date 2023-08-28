@@ -38,7 +38,7 @@ func (p *Processor) BookmarkCreate(ctx context.Context, requestingAccount *gtsmo
 
 	if existingBookmarkID != "" {
 		// Status is already bookmarked.
-		return p.apiStatus(ctx, targetStatus, requestingAccount)
+		return p.c.GetAPIStatus(ctx, requestingAccount, targetStatus)
 	}
 
 	// Create and store a new bookmark.
@@ -57,12 +57,12 @@ func (p *Processor) BookmarkCreate(ctx context.Context, requestingAccount *gtsmo
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
-	if err := p.invalidateStatus(ctx, requestingAccount.ID, targetStatusID); err != nil {
+	if err := p.c.InvalidateTimelinedStatus(ctx, requestingAccount.ID, targetStatusID); err != nil {
 		err = gtserror.Newf("error invalidating status from timelines: %w", err)
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
-	return p.apiStatus(ctx, targetStatus, requestingAccount)
+	return p.c.GetAPIStatus(ctx, requestingAccount, targetStatus)
 }
 
 // BookmarkRemove removes a bookmark for the requesting account, targeting the given status (no-op if bookmark doesn't exist).
@@ -74,7 +74,7 @@ func (p *Processor) BookmarkRemove(ctx context.Context, requestingAccount *gtsmo
 
 	if existingBookmarkID == "" {
 		// Status isn't bookmarked.
-		return p.apiStatus(ctx, targetStatus, requestingAccount)
+		return p.c.GetAPIStatus(ctx, requestingAccount, targetStatus)
 	}
 
 	// We have a bookmark to remove.
@@ -83,16 +83,16 @@ func (p *Processor) BookmarkRemove(ctx context.Context, requestingAccount *gtsmo
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
-	if err := p.invalidateStatus(ctx, requestingAccount.ID, targetStatusID); err != nil {
+	if err := p.c.InvalidateTimelinedStatus(ctx, requestingAccount.ID, targetStatusID); err != nil {
 		err = gtserror.Newf("error invalidating status from timelines: %w", err)
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
-	return p.apiStatus(ctx, targetStatus, requestingAccount)
+	return p.c.GetAPIStatus(ctx, requestingAccount, targetStatus)
 }
 
 func (p *Processor) getBookmarkTarget(ctx context.Context, requestingAccount *gtsmodel.Account, targetStatusID string) (*gtsmodel.Status, string, gtserror.WithCode) {
-	targetStatus, errWithCode := p.getVisibleStatus(ctx, requestingAccount, targetStatusID)
+	targetStatus, errWithCode := p.c.GetVisibleTargetStatus(ctx, requestingAccount, targetStatusID)
 	if errWithCode != nil {
 		return nil, "", errWithCode
 	}

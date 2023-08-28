@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // EmojiAllDomains can be used as the `domain` value in a GetEmojis
@@ -43,33 +44,42 @@ type Emoji interface {
 	GetUseableEmojis(ctx context.Context) ([]*gtsmodel.Emoji, error)
 
 	// GetEmojis fetches all emojis with IDs less than 'maxID', up to a maximum of 'limit' emojis.
-	GetEmojis(ctx context.Context, maxID string, limit int) ([]*gtsmodel.Emoji, error)
+	GetEmojis(ctx context.Context, page *paging.Page[string]) ([]*gtsmodel.Emoji, error)
 
 	// GetRemoteEmojis fetches all remote emojis with IDs less than 'maxID', up to a maximum of 'limit' emojis.
-	GetRemoteEmojis(ctx context.Context, maxID string, limit int) ([]*gtsmodel.Emoji, error)
+	GetRemoteEmojis(ctx context.Context, page *paging.Page[string]) ([]*gtsmodel.Emoji, error)
 
 	// GetCachedEmojisOlderThan fetches all cached remote emojis with 'updated_at' greater than 'olderThan', up to a maximum of 'limit' emojis.
 	GetCachedEmojisOlderThan(ctx context.Context, olderThan time.Time, limit int) ([]*gtsmodel.Emoji, error)
 
 	// GetEmojisBy gets emojis based on given parameters. Useful for admin actions.
-	GetEmojisBy(ctx context.Context, domain string, includeDisabled bool, includeEnabled bool, shortcode string, maxShortcodeDomain string, minShortcodeDomain string, limit int) ([]*gtsmodel.Emoji, error)
+	GetEmojisBy(ctx context.Context, domain string, includeDisabled bool, includeEnabled bool, shortcode string, page *paging.Page[string]) ([]*gtsmodel.Emoji, error)
+
 	// GetEmojiByID gets a specific emoji by its database ID.
 	GetEmojiByID(ctx context.Context, id string) (*gtsmodel.Emoji, error)
+
 	// GetEmojiByShortcodeDomain gets an emoji based on its shortcode and domain.
 	// For local emoji, domain should be an empty string.
 	GetEmojiByShortcodeDomain(ctx context.Context, shortcode string, domain string) (*gtsmodel.Emoji, error)
+
 	// GetEmojiByURI returns one emoji based on its ActivityPub URI.
 	GetEmojiByURI(ctx context.Context, uri string) (*gtsmodel.Emoji, error)
+
 	// GetEmojiByStaticURL gets an emoji using the URL of the static version of the emoji image.
 	GetEmojiByStaticURL(ctx context.Context, imageStaticURL string) (*gtsmodel.Emoji, error)
+
 	// PutEmojiCategory puts one new emoji category in the database.
 	PutEmojiCategory(ctx context.Context, emojiCategory *gtsmodel.EmojiCategory) error
+
 	// GetEmojiCategoriesByIDs gets emoji categories for given IDs.
 	GetEmojiCategoriesByIDs(ctx context.Context, ids []string) ([]*gtsmodel.EmojiCategory, error)
+
 	// GetEmojiCategories gets a slice of the names of all existing emoji categories.
 	GetEmojiCategories(ctx context.Context) ([]*gtsmodel.EmojiCategory, error)
+
 	// GetEmojiCategory gets one emoji category by its id.
 	GetEmojiCategory(ctx context.Context, id string) (*gtsmodel.EmojiCategory, error)
+
 	// GetEmojiCategoryByName gets one emoji category by its name.
 	GetEmojiCategoryByName(ctx context.Context, name string) (*gtsmodel.EmojiCategory, error)
 }

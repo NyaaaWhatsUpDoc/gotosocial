@@ -24,6 +24,7 @@ import (
 	apiutil "github.com/superseriousbusiness/gotosocial/internal/api/util"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // HomeTimelineGETHandler swagger:operation GET /api/v1/timelines/home homeTimeline
@@ -133,10 +134,12 @@ func (m *Module) HomeTimelineGETHandler(c *gin.Context) {
 	resp, errWithCode := m.processor.Timeline().HomeTimelineGet(
 		c.Request.Context(),
 		authed,
-		c.Query(apiutil.MaxIDKey),
-		c.Query(apiutil.SinceIDKey),
-		c.Query(apiutil.MinIDKey),
-		limit,
+		&paging.Page[string]{
+			// Query provided paging values (note they may be empty).
+			Min:   paging.MinID(c.Query("min_id"), c.Query("since_id")),
+			Max:   paging.MaxID(c.Query("max_id")),
+			Limit: limit,
+		},
 		local,
 	)
 	if errWithCode != nil {

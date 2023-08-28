@@ -27,6 +27,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
 	"github.com/uptrace/bun"
 )
@@ -51,8 +52,16 @@ func (r *reportDB) GetReportByID(ctx context.Context, id string) (*gtsmodel.Repo
 	)
 }
 
-func (r *reportDB) GetReports(ctx context.Context, resolved *bool, accountID string, targetAccountID string, maxID string, sinceID string, minID string, limit int) ([]*gtsmodel.Report, error) {
-	reportIDs := []string{}
+func (r *reportDB) GetReports(ctx context.Context, resolved *bool, accountID string, targetAccountID string, page *paging.Page[string]) ([]*gtsmodel.Report, error) {
+	var (
+		// Get paging parameters.
+		minID, _ = page.GetMin()
+		maxID, _ = page.GetMax()
+		limit, _ = page.GetLimit()
+
+		// Make educated guess for slice size
+		reportIDs = make([]string, 0, limit)
+	)
 
 	q := r.db.
 		NewSelect().
@@ -79,10 +88,6 @@ func (r *reportDB) GetReports(ctx context.Context, resolved *bool, accountID str
 
 	if maxID != "" {
 		q = q.Where("? < ?", bun.Ident("report.id"), maxID)
-	}
-
-	if sinceID != "" {
-		q = q.Where("? > ?", bun.Ident("report.id"), minID)
 	}
 
 	if minID != "" {

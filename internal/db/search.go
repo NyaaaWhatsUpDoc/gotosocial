@@ -21,15 +21,16 @@ import (
 	"context"
 
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 type Search interface {
 	// SearchForAccounts uses the given query text to search for accounts that accountID follows.
-	SearchForAccounts(ctx context.Context, accountID string, query string, maxID string, minID string, limit int, following bool, offset int) ([]*gtsmodel.Account, error)
+	SearchForAccounts(ctx context.Context, accountID string, query string, page *paging.Page[string], following bool, offset int) ([]*gtsmodel.Account, error)
 
 	// SearchForStatuses uses the given query text to search for statuses created by accountID, or in reply to accountID.
-	SearchForStatuses(ctx context.Context, accountID string, query string, maxID string, minID string, limit int, offset int) ([]*gtsmodel.Status, error)
+	SearchForStatuses(ctx context.Context, accountID string, query string, page *paging.Page[string], offset int) ([]*gtsmodel.Status, error)
 
 	// SearchForTags searches for tags that start with the given query text (case insensitive).
-	SearchForTags(ctx context.Context, query string, maxID string, minID string, limit int, offset int) ([]*gtsmodel.Tag, error)
+	SearchForTags(ctx context.Context, query string, page *paging.Page[string], offset int) ([]*gtsmodel.Tag, error)
 }

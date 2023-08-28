@@ -28,8 +28,8 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
-	"github.com/superseriousbusiness/gotosocial/internal/id"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
 	"github.com/superseriousbusiness/gotosocial/internal/util"
 	"github.com/uptrace/bun"
@@ -512,16 +512,19 @@ func (a *accountDB) CountAccountPinned(ctx context.Context, accountID string) (i
 		Count(ctx)
 }
 
-func (a *accountDB) GetAccountStatuses(ctx context.Context, accountID string, limit int, excludeReplies bool, excludeReblogs bool, maxID string, minID string, mediaOnly bool, publicOnly bool) ([]*gtsmodel.Status, error) {
-	// Ensure reasonable
-	if limit < 0 {
-		limit = 0
-	}
-
-	// Make educated guess for slice size
+func (a *accountDB) GetAccountStatuses(ctx context.Context, accountID string, page *paging.Page[string], excludeReplies bool, excludeReblogs bool, mediaOnly bool, publicOnly bool) ([]*gtsmodel.Status, error) {
 	var (
-		statusIDs   = make([]string, 0, limit)
-		frontToBack = true
+		// Get paging parameters.
+		minID, _ = page.GetMin()
+		maxID, _ = page.GetMax()
+		limit, _ = page.GetLimit()
+		order, _ = page.GetOrder()
+
+		// Make educated guess for slice size
+		statusIDs = make([]string, 0, limit)
+
+		// check requested return order based on paging
+		frontToBack = (order == paging.OrderAscending)
 	)
 
 	q := a.db.
@@ -573,18 +576,14 @@ func (a *accountDB) GetAccountStatuses(ctx context.Context, accountID string, li
 		q = q.Where("? = ?", bun.Ident("status.visibility"), gtsmodel.VisibilityPublic)
 	}
 
-	// return only statuses LOWER (ie., older) than maxID
-	if maxID == "" {
-		maxID = id.Highest
+	if maxID != "" {
+		// return only statuses LOWER (ie., older) than maxID
+		q = q.Where("? < ?", bun.Ident("status.id"), maxID)
 	}
-	q = q.Where("? < ?", bun.Ident("status.id"), maxID)
 
 	if minID != "" {
 		// return only statuses HIGHER (ie., newer) than minID
 		q = q.Where("? > ?", bun.Ident("status.id"), minID)
-
-		// page up
-		frontToBack = false
 	}
 
 	if limit > 0 {
@@ -634,14 +633,15 @@ func (a *accountDB) GetAccountPinnedStatuses(ctx context.Context, accountID stri
 	return a.statusesFromIDs(ctx, statusIDs)
 }
 
-func (a *accountDB) GetAccountWebStatuses(ctx context.Context, accountID string, limit int, maxID string) ([]*gtsmodel.Status, error) {
-	// Ensure reasonable
-	if limit < 0 {
-		limit = 0
-	}
+func (a *accountDB) GetAccountWebStatuses(ctx context.Context, accountID string, page *paging.Page[string]) ([]*gtsmodel.Status, error) {
+	var (
+		// Get paging parameters.
+		maxID, _ = page.GetMax()
+		limit, _ = page.GetLimit()
 
-	// Make educated guess for slice size
-	statusIDs := make([]string, 0, limit)
+		// Make educated guess for slice size
+		statusIDs = make([]string, 0, limit)
+	)
 
 	q := a.db.
 		NewSelect().
@@ -657,15 +657,9 @@ func (a *accountDB) GetAccountWebStatuses(ctx context.Context, accountID string,
 		// Don't show local-only statuses on the web view.
 		Where("? = ?", bun.Ident("status.federated"), true)
 
-	// return only statuses LOWER (ie., older) than maxID
-	if maxID == "" {
-		maxID = id.Highest
-	}
-	q = q.Where("? < ?", bun.Ident("status.id"), maxID)
-
-	if limit > 0 {
-		// limit amount of statuses returned
-		q = q.Limit(limit)
+	if maxID != "" {
+		// return only statuses LOWER (ie., older) than maxID
+		q = q.Where("? < ?", bun.Ident("status.id"), maxID)
 	}
 
 	if limit > 0 {
@@ -673,6 +667,7 @@ func (a *accountDB) GetAccountWebStatuses(ctx context.Context, accountID string,
 		q = q.Limit(limit)
 	}
 
+	// Page down.
 	q = q.Order("status.id DESC")
 
 	if err := q.Scan(ctx, &statusIDs); err != nil {

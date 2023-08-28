@@ -27,6 +27,7 @@ import (
 	apiutil "github.com/superseriousbusiness/gotosocial/internal/api/util"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // AccountStatusesGETHandler swagger:operation GET /api/v1/accounts/{id}/statuses accountStatuses
@@ -148,16 +149,16 @@ func (m *Module) AccountStatusesGETHandler(c *gin.Context) {
 		return
 	}
 
-	limit := 30
-	limitString := c.Query(LimitKey)
-	if limitString != "" {
-		i, err := strconv.ParseInt(limitString, 10, 32)
-		if err != nil {
-			err := fmt.Errorf("error parsing %s: %s", LimitKey, err)
-			apiutil.ErrorHandler(c, gtserror.NewErrorBadRequest(err, err.Error()), m.processor.InstanceGetV1)
-			return
-		}
-		limit = int(i)
+	// Parse limit from query string (if any).
+	limit, errWithCode := apiutil.ParseLimit(
+		c.Query("limit"),
+		40,
+		100,
+		2,
+	)
+	if errWithCode != nil {
+		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
+		return
 	}
 
 	excludeReplies := false
@@ -182,18 +183,6 @@ func (m *Module) AccountStatusesGETHandler(c *gin.Context) {
 			return
 		}
 		excludeReblogs = i
-	}
-
-	maxID := ""
-	maxIDString := c.Query(MaxIDKey)
-	if maxIDString != "" {
-		maxID = maxIDString
-	}
-
-	minID := ""
-	minIDString := c.Query(MinIDKey)
-	if minIDString != "" {
-		minID = minIDString
 	}
 
 	pinnedOnly := false
@@ -232,7 +221,22 @@ func (m *Module) AccountStatusesGETHandler(c *gin.Context) {
 		publicOnly = i
 	}
 
-	resp, errWithCode := m.processor.Account().StatusesGet(c.Request.Context(), authed.Account, targetAcctID, limit, excludeReplies, excludeReblogs, maxID, minID, pinnedOnly, mediaOnly, publicOnly)
+	resp, errWithCode := m.processor.Account().StatusesGet(
+		c.Request.Context(),
+		authed.Account,
+		targetAcctID,
+		&paging.Page[string]{
+			// Query provided paging values (note they may be empty).
+			Min:   paging.MinID(c.Query("min_id"), c.Query("since_id")),
+			Max:   paging.MaxID(c.Query("max_id")),
+			Limit: limit,
+		},
+		excludeReplies,
+		excludeReblogs,
+		pinnedOnly,
+		mediaOnly,
+		publicOnly,
+	)
 	if errWithCode != nil {
 		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
 		return
@@ -241,5 +245,6 @@ func (m *Module) AccountStatusesGETHandler(c *gin.Context) {
 	if resp.LinkHeader != "" {
 		c.Header("Link", resp.LinkHeader)
 	}
+
 	c.JSON(http.StatusOK, resp.Items)
 }

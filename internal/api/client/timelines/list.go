@@ -24,6 +24,7 @@ import (
 	apiutil "github.com/superseriousbusiness/gotosocial/internal/api/util"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // ListTimelineGETHandler swagger:operation GET /api/v1/timelines/list/{id} listTimeline
@@ -132,10 +133,12 @@ func (m *Module) ListTimelineGETHandler(c *gin.Context) {
 		c.Request.Context(),
 		authed,
 		targetListID,
-		c.Query(apiutil.MaxIDKey),
-		c.Query(apiutil.SinceIDKey),
-		c.Query(apiutil.MinIDKey),
-		limit,
+		&paging.Page[string]{
+			// Query provided paging values (note they may be empty).
+			Min:   paging.MinID(c.Query("min_id"), c.Query("since_id")),
+			Max:   paging.MaxID(c.Query("max_id")),
+			Limit: limit,
+		},
 	)
 	if errWithCode != nil {
 		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
@@ -143,7 +146,9 @@ func (m *Module) ListTimelineGETHandler(c *gin.Context) {
 	}
 
 	if resp.LinkHeader != "" {
+		// Add paging link header if found.
 		c.Header("Link", resp.LinkHeader)
 	}
+
 	c.JSON(http.StatusOK, resp.Items)
 }

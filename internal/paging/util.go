@@ -15,14 +15,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package model
+package paging
 
-// Context models the tree around a given status.
-//
-// swagger:model statusContext
-type Context struct {
-	// Parents in the thread.
-	Ancestors []*Status `json:"ancestors"`
-	// Children in the thread.
-	Descendants []*Status `json:"descendants"`
+// zero is a shorthand to check a generic value is its zero value.
+func zero[T comparable](t T) bool {
+	var z T
+	return t == z
 }

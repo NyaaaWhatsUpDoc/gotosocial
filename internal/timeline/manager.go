@@ -24,6 +24,7 @@ import (
 
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 const (
@@ -54,7 +55,7 @@ type Manager interface {
 	IngestOne(ctx context.Context, timelineID string, item Timelineable) (bool, error)
 
 	// GetTimeline returns limit n amount of prepared entries from the given timeline, in descending chronological order.
-	GetTimeline(ctx context.Context, timelineID string, maxID string, sinceID string, minID string, limit int, local bool) ([]Preparable, error)
+	GetTimeline(ctx context.Context, timelineID string, page *paging.Page[string], local bool) ([]Preparable, error)
 
 	// GetIndexedLength returns the amount of items that have been indexed for the given account ID.
 	GetIndexedLength(ctx context.Context, timelineID string) int
@@ -178,8 +179,8 @@ func (m *manager) RemoveTimeline(ctx context.Context, timelineID string) error {
 	return nil
 }
 
-func (m *manager) GetTimeline(ctx context.Context, timelineID string, maxID string, sinceID string, minID string, limit int, local bool) ([]Preparable, error) {
-	return m.getOrCreateTimeline(ctx, timelineID).Get(ctx, limit, maxID, sinceID, minID, true)
+func (m *manager) GetTimeline(ctx context.Context, timelineID string, page *paging.Page[string], local bool) ([]Preparable, error) {
+	return m.getOrCreateTimeline(ctx, timelineID).Get(ctx, page, true)
 }
 
 func (m *manager) GetIndexedLength(ctx context.Context, timelineID string) int {

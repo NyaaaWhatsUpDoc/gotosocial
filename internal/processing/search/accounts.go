@@ -27,8 +27,8 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
-	"github.com/superseriousbusiness/gotosocial/internal/id"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // Accounts does a partial search for accounts that
@@ -104,9 +104,7 @@ func (p *Processor) Accounts(
 	if _, err := p.accountsByNamestring(
 		ctx,
 		requestingAccount,
-		id.Highest,
-		id.Lowest,
-		limit,
+		&paging.Page[string]{Limit: limit},
 		offset,
 		query,
 		resolve,

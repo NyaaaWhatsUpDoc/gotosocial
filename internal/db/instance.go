@@ -21,6 +21,7 @@ import (
 	"context"
 
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // Instance contains functions for instance-level actions (counting instance users etc.).
@@ -47,7 +48,7 @@ type Instance interface {
 	UpdateInstance(ctx context.Context, instance *gtsmodel.Instance, columns ...string) error
 
 	// GetInstanceAccounts returns a slice of accounts from the given instance, arranged by ID.
-	GetInstanceAccounts(ctx context.Context, domain string, maxID string, limit int) ([]*gtsmodel.Account, error)
+	GetInstanceAccounts(ctx context.Context, domain string, page *paging.Page[string]) ([]*gtsmodel.Account, error)
 
 	// GetInstancePeers returns a slice of instances that the host instance knows about.
 	GetInstancePeers(ctx context.Context, includeSuspended bool) ([]*gtsmodel.Instance, error)

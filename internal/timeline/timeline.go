@@ -21,6 +21,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // GrabFunction is used by a Timeline to grab more items to index.
@@ -37,7 +39,7 @@ import (
 // If an error is returned, the timeline will stop processing whatever request called GrabFunction,
 // and return the error. If no error is returned, but stop = true, this indicates to the caller of GrabFunction
 // that there are no more items to return, and processing should continue with the items already grabbed.
-type GrabFunction func(ctx context.Context, timelineID string, maxID string, sinceID string, minID string, limit int) (items []Timelineable, stop bool, err error)
+type GrabFunction func(ctx context.Context, timelineID string, page *paging.Page[string]) (items []Timelineable, stop bool, err error)
 
 // FilterFunction is used by a Timeline to filter whether or not a grabbed item should be indexed.
 type FilterFunction func(ctx context.Context, timelineID string, item Timelineable) (shouldIndex bool, err error)
@@ -72,7 +74,7 @@ type Timeline interface {
 	// Get returns an amount of prepared items with the given parameters.
 	// If prepareNext is true, then the next predicted query will be prepared already in a goroutine,
 	// to make the next call to Get faster.
-	Get(ctx context.Context, amount int, maxID string, sinceID string, minID string, prepareNext bool) ([]Preparable, error)
+	Get(ctx context.Context, page *paging.Page[string], prepareNext bool) ([]Preparable, error)
 
 	/*
 		INDEXING + PREPARATION FUNCTIONS

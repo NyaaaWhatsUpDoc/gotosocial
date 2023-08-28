@@ -22,8 +22,8 @@ import (
 	"strings"
 
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
-	"github.com/superseriousbusiness/gotosocial/internal/id"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/dialect"
@@ -73,21 +73,22 @@ func (s *searchDB) SearchForAccounts(
 	ctx context.Context,
 	accountID string,
 	query string,
-	maxID string,
-	minID string,
-	limit int,
+	page *paging.Page[string],
 	following bool,
 	offset int,
 ) ([]*gtsmodel.Account, error) {
-	// Ensure reasonable
-	if limit < 0 {
-		limit = 0
-	}
-
-	// Make educated guess for slice size
 	var (
-		accountIDs  = make([]string, 0, limit)
-		frontToBack = true
+		// Get paging parameters.
+		minID, _ = page.GetMin()
+		maxID, _ = page.GetMax()
+		limit, _ = page.GetLimit()
+		order, _ = page.GetOrder()
+
+		// Make educated guess for slice size
+		accountIDs = make([]string, 0, limit)
+
+		// check requested return order based on paging
+		frontToBack = (order == paging.OrderAscending)
 	)
 
 	q := s.db.
@@ -105,18 +106,14 @@ func (s *searchDB) SearchForAccounts(
 				WhereOr("? != ?", bun.Ident("account.domain"), bun.Ident("account.username"))
 		})
 
-	// Return only items with a LOWER id than maxID.
-	if maxID == "" {
-		maxID = id.Highest
+	if maxID != "" {
+		// Return only items with a LOWER id than maxID.
+		q = q.Where("? < ?", bun.Ident("account.id"), maxID)
 	}
-	q = q.Where("? < ?", bun.Ident("account.id"), maxID)
 
 	if minID != "" {
 		// Return only items with a HIGHER id than minID.
 		q = q.Where("? > ?", bun.Ident("account.id"), minID)
-
-		// page up
-		frontToBack = false
 	}
 
 	if following {
@@ -261,20 +258,21 @@ func (s *searchDB) SearchForStatuses(
 	ctx context.Context,
 	accountID string,
 	query string,
-	maxID string,
-	minID string,
-	limit int,
+	page *paging.Page[string],
 	offset int,
 ) ([]*gtsmodel.Status, error) {
-	// Ensure reasonable
-	if limit < 0 {
-		limit = 0
-	}
-
-	// Make educated guess for slice size
 	var (
-		statusIDs   = make([]string, 0, limit)
-		frontToBack = true
+		// Get paging parameters.
+		minID, _ = page.GetMin()
+		maxID, _ = page.GetMax()
+		limit, _ = page.GetLimit()
+		order, _ = page.GetOrder()
+
+		// Make educated guess for slice size
+		statusIDs = make([]string, 0, limit)
+
+		// check requested return order based on paging
+		frontToBack = (order == paging.OrderAscending)
 	)
 
 	q := s.db.
@@ -292,18 +290,14 @@ func (s *searchDB) SearchForStatuses(
 				WhereOr("? = ?", bun.Ident("status.in_reply_to_account_id"), accountID)
 		})
 
-	// Return only items with a LOWER id than maxID.
-	if maxID == "" {
-		maxID = id.Highest
+	if maxID != "" {
+		// return only statuses LOWER (i.e. older) than maxID
+		q.Where("? < ?", bun.Ident("status.id"), maxID)
 	}
-	q = q.Where("? < ?", bun.Ident("status.id"), maxID)
 
 	if minID != "" {
 		// return only statuses HIGHER (ie., newer) than minID
 		q = q.Where("? > ?", bun.Ident("status.id"), minID)
-
-		// page up
-		frontToBack = false
 	}
 
 	// Select status text as subquery.
@@ -396,20 +390,21 @@ func (s *searchDB) statusText() *bun.SelectQuery {
 func (s *searchDB) SearchForTags(
 	ctx context.Context,
 	query string,
-	maxID string,
-	minID string,
-	limit int,
+	page *paging.Page[string],
 	offset int,
 ) ([]*gtsmodel.Tag, error) {
-	// Ensure reasonable
-	if limit < 0 {
-		limit = 0
-	}
-
-	// Make educated guess for slice size
 	var (
-		tagIDs      = make([]string, 0, limit)
-		frontToBack = true
+		// Get paging parameters.
+		minID, _ = page.GetMin()
+		maxID, _ = page.GetMax()
+		limit, _ = page.GetLimit()
+		order, _ = page.GetOrder()
+
+		// Make educated guess for slice size
+		tagIDs = make([]string, 0, limit)
+
+		// check requested return order based on paging
+		frontToBack = (order == paging.OrderAscending)
 	)
 
 	q := s.db.
@@ -418,18 +413,14 @@ func (s *searchDB) SearchForTags(
 		// Select only IDs from table
 		Column("tag.id")
 
-	// Return only items with a LOWER id than maxID.
-	if maxID == "" {
-		maxID = id.Highest
+	if maxID != "" {
+		// return only items with a LOWER id than maxID.
+		q = q.Where("? < ?", bun.Ident("tag.id"), maxID)
 	}
-	q = q.Where("? < ?", bun.Ident("tag.id"), maxID)
 
 	if minID != "" {
 		// return only tags HIGHER (ie., newer) than minID
 		q = q.Where("? > ?", bun.Ident("tag.id"), minID)
-
-		// page up
-		frontToBack = false
 	}
 
 	// Normalize tag 'name' string.

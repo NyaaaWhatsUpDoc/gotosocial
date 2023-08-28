@@ -18,12 +18,16 @@
 package timeline
 
 import (
+	"github.com/superseriousbusiness/gotosocial/internal/processing/common"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
 	"github.com/superseriousbusiness/gotosocial/internal/typeutils"
 	"github.com/superseriousbusiness/gotosocial/internal/visibility"
 )
 
 type Processor struct {
+	// embedded common logic
+	c *common.Processor
+
 	state  *state.State
 	tc     typeutils.TypeConverter
 	filter *visibility.Filter

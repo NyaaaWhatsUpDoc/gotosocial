@@ -95,23 +95,21 @@ func (m *Module) AccountFollowingGETHandler(c *gin.Context) {
 		100,
 		2,
 	)
-	if err != nil {
+	if errWithCode != nil {
 		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
 		return
 	}
 
 	// Fetch following for the provided target account `as` auth.
-	following, errWithCode := m.processor.Account().FollowingGet(
+	resp, errWithCode := m.processor.Account().FollowingGet(
 		c.Request.Context(),
 		authed.Account,
 		targetAcctID,
-		&paging.Pager{
-			// Query provided paging values,
-			// it's okay for these to be empty.
-			SinceID: c.Query("since_id"),
-			MinID:   c.Query("min_id"),
-			MaxID:   c.Query("max_id"),
-			Limit:   limit,
+		&paging.Page[string]{
+			// Query provided paging values (note they may be empty).
+			Min:   paging.MinID(c.Query("min_id"), c.Query("since_id")),
+			Max:   paging.MaxID(c.Query("max_id")),
+			Limit: limit,
 		},
 	)
 	if errWithCode != nil {
@@ -119,5 +117,10 @@ func (m *Module) AccountFollowingGETHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, following)
+	if resp.LinkHeader != "" {
+		// Add paging link header if found.
+		c.Header("Link", resp.LinkHeader)
+	}
+
+	c.JSON(http.StatusOK, resp.Items)
 }

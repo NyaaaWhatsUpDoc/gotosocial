@@ -26,17 +26,17 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
 	"github.com/superseriousbusiness/gotosocial/internal/timeline"
 	"github.com/superseriousbusiness/gotosocial/internal/typeutils"
-	"github.com/superseriousbusiness/gotosocial/internal/util"
 	"github.com/superseriousbusiness/gotosocial/internal/visibility"
 )
 
 // HomeTimelineGrab returns a function that satisfies GrabFunction for home timelines.
 func HomeTimelineGrab(state *state.State) timeline.GrabFunction {
-	return func(ctx context.Context, accountID string, maxID string, sinceID string, minID string, limit int) ([]timeline.Timelineable, bool, error) {
-		statuses, err := state.DB.GetHomeTimeline(ctx, accountID, maxID, sinceID, minID, limit, false)
+	return func(ctx context.Context, accountID string, page *paging.Page[string]) ([]timeline.Timelineable, bool, error) {
+		statuses, err := state.DB.GetHomeTimeline(ctx, accountID, page, false)
 		if err != nil && !errors.Is(err, db.ErrNoEntries) {
 			err = gtserror.Newf("error getting statuses from db: %w", err)
 			return nil, false, err
@@ -102,8 +102,8 @@ func HomeTimelineStatusPrepare(state *state.State, tc typeutils.TypeConverter) t
 	}
 }
 
-func (p *Processor) HomeTimelineGet(ctx context.Context, authed *oauth.Auth, maxID string, sinceID string, minID string, limit int, local bool) (*apimodel.PageableResponse, gtserror.WithCode) {
-	statuses, err := p.state.Timelines.Home.GetTimeline(ctx, authed.Account.ID, maxID, sinceID, minID, limit, local)
+func (p *Processor) HomeTimelineGet(ctx context.Context, authed *oauth.Auth, page *paging.Page[string], local bool) (*apimodel.PageableResponse, gtserror.WithCode) {
+	statuses, err := p.state.Timelines.Home.GetTimeline(ctx, authed.Account.ID, page, local)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
 		err = gtserror.Newf("error getting statuses: %w", err)
 		return nil, gtserror.NewErrorInternalError(err)
@@ -111,7 +111,7 @@ func (p *Processor) HomeTimelineGet(ctx context.Context, authed *oauth.Auth, max
 
 	count := len(statuses)
 	if count == 0 {
-		return util.EmptyPageableResponse(), nil
+		return paging.EmptyResponse(), nil
 	}
 
 	var (
@@ -124,11 +124,10 @@ func (p *Processor) HomeTimelineGet(ctx context.Context, authed *oauth.Auth, max
 		items[i] = statuses[i]
 	}
 
-	return util.PackagePageableResponse(util.PageableResponseParams{
-		Items:          items,
-		Path:           "/api/v1/timelines/home",
-		NextMaxIDValue: nextMaxIDValue,
-		PrevMinIDValue: prevMinIDValue,
-		Limit:          limit,
-	})
+	return paging.PackageResponse(paging.ResponseParams[string]{
+		Items: items,
+		Path:  "/api/v1/timelines/home",
+		Next:  page.Next(nextMaxIDValue),
+		Prev:  page.Prev(prevMinIDValue),
+	}), nil
 }

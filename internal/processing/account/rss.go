@@ -28,6 +28,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 const (
@@ -46,9 +47,7 @@ type GetRSSFeed func() (string, gtserror.WithCode)
 // If the account has not yet posted an RSS-eligible status, the returned last-modified
 // time will be zero, and the GetRSSFeed func will return a valid RSS xml with no items.
 func (p *Processor) GetRSSFeedForUsername(ctx context.Context, username string) (GetRSSFeed, time.Time, gtserror.WithCode) {
-	var (
-		never = time.Time{}
-	)
+	never := time.Time{}
 
 	account, err := p.state.DB.GetAccountByUsernameDomain(ctx, username, "")
 	if err != nil {
@@ -114,7 +113,9 @@ func (p *Processor) GetRSSFeedForUsername(ctx context.Context, username string) 
 		feed.Updated = lastPostAt
 
 		// Retrieve latest statuses as they'd be shown on the web view of the account profile.
-		statuses, err := p.state.DB.GetAccountWebStatuses(ctx, account.ID, rssFeedLength, "")
+		statuses, err := p.state.DB.GetAccountWebStatuses(ctx, account.ID, &paging.Page[string]{
+			Limit: rssFeedLength,
+		})
 		if err != nil && !errors.Is(err, db.ErrNoEntries) {
 			err = fmt.Errorf("db error getting account web statuses: %w", err)
 			return "", gtserror.NewErrorInternalError(err)

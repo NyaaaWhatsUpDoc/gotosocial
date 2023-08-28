@@ -15,14 +15,37 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-package model
+package paging
 
-// Context models the tree around a given status.
-//
-// swagger:model statusContext
-type Context struct {
-	// Parents in the thread.
-	Ancestors []*Status `json:"ancestors"`
-	// Children in the thread.
-	Descendants []*Status `json:"descendants"`
+type Order int
+
+const (
+	_ Order = iota
+	OrderAscending
+	OrderDescending
+)
+
+func (i Order) Ascending() bool {
+	return i == OrderAscending
+}
+
+func (i Order) Descending() bool {
+	return i == OrderDescending
+}
+
+func (i Order) None() bool {
+	return i == 0
+}
+
+func (i Order) String() string {
+	switch i {
+	case 0:
+		return "0"
+	case OrderAscending:
+		return "Ascending"
+	case OrderDescending:
+		return "Descending"
+	default:
+		return "???"
+	}
 }

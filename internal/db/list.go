@@ -21,6 +21,7 @@ import (
 	"context"
 
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 type List interface {
@@ -47,7 +48,7 @@ type List interface {
 	GetListEntryByID(ctx context.Context, id string) (*gtsmodel.ListEntry, error)
 
 	// GetListEntries gets list entries from the given listID, using the given parameters.
-	GetListEntries(ctx context.Context, listID string, maxID string, sinceID string, minID string, limit int) ([]*gtsmodel.ListEntry, error)
+	GetListEntries(ctx context.Context, listID string, page *paging.Page[string]) ([]*gtsmodel.ListEntry, error)
 
 	// GetListEntriesForFollowID returns all listEntries that pertain to the given followID.
 	GetListEntriesForFollowID(ctx context.Context, followID string) ([]*gtsmodel.ListEntry, error)

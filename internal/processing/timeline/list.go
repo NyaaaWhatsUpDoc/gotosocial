@@ -26,17 +26,17 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
 	"github.com/superseriousbusiness/gotosocial/internal/timeline"
 	"github.com/superseriousbusiness/gotosocial/internal/typeutils"
-	"github.com/superseriousbusiness/gotosocial/internal/util"
 	"github.com/superseriousbusiness/gotosocial/internal/visibility"
 )
 
 // ListTimelineGrab returns a function that satisfies GrabFunction for list timelines.
 func ListTimelineGrab(state *state.State) timeline.GrabFunction {
-	return func(ctx context.Context, listID string, maxID string, sinceID string, minID string, limit int) ([]timeline.Timelineable, bool, error) {
-		statuses, err := state.DB.GetListTimeline(ctx, listID, maxID, sinceID, minID, limit)
+	return func(ctx context.Context, listID string, page *paging.Page[string]) ([]timeline.Timelineable, bool, error) {
+		statuses, err := state.DB.GetListTimeline(ctx, listID, page)
 		if err != nil && !errors.Is(err, db.ErrNoEntries) {
 			err = gtserror.Newf("error getting statuses from db: %w", err)
 			return nil, false, err
@@ -114,7 +114,7 @@ func ListTimelineStatusPrepare(state *state.State, tc typeutils.TypeConverter) t
 	}
 }
 
-func (p *Processor) ListTimelineGet(ctx context.Context, authed *oauth.Auth, listID string, maxID string, sinceID string, minID string, limit int) (*apimodel.PageableResponse, gtserror.WithCode) {
+func (p *Processor) ListTimelineGet(ctx context.Context, authed *oauth.Auth, listID string, page *paging.Page[string]) (*apimodel.PageableResponse, gtserror.WithCode) {
 	// Ensure list exists + is owned by this account.
 	list, err := p.state.DB.GetListByID(ctx, listID)
 	if err != nil {
@@ -129,7 +129,7 @@ func (p *Processor) ListTimelineGet(ctx context.Context, authed *oauth.Auth, lis
 		return nil, gtserror.NewErrorNotFound(err)
 	}
 
-	statuses, err := p.state.Timelines.List.GetTimeline(ctx, listID, maxID, sinceID, minID, limit, false)
+	statuses, err := p.state.Timelines.List.GetTimeline(ctx, listID, page, false)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
 		err = gtserror.Newf("error getting statuses: %w", err)
 		return nil, gtserror.NewErrorInternalError(err)
@@ -137,7 +137,7 @@ func (p *Processor) ListTimelineGet(ctx context.Context, authed *oauth.Auth, lis
 
 	count := len(statuses)
 	if count == 0 {
-		return util.EmptyPageableResponse(), nil
+		return paging.EmptyResponse(), nil
 	}
 
 	var (
@@ -150,11 +150,10 @@ func (p *Processor) ListTimelineGet(ctx context.Context, authed *oauth.Auth, lis
 		items[i] = statuses[i]
 	}
 
-	return util.PackagePageableResponse(util.PageableResponseParams{
-		Items:          items,
-		Path:           "/api/v1/timelines/list/" + listID,
-		NextMaxIDValue: nextMaxIDValue,
-		PrevMinIDValue: prevMinIDValue,
-		Limit:          limit,
-	})
+	return paging.PackageResponse(paging.ResponseParams[string]{
+		Items: items,
+		Path:  "/api/v1/timelines/list/" + listID,
+		Next:  page.Next(nextMaxIDValue),
+		Prev:  page.Prev(prevMinIDValue),
+	}), nil
 }

@@ -21,6 +21,7 @@ import (
 	"context"
 
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 type StatusBookmark interface {
@@ -36,7 +37,7 @@ type StatusBookmark interface {
 	//
 	// This function is primarily useful for paging through bookmarks in a sort of
 	// timeline view.
-	GetStatusBookmarks(ctx context.Context, accountID string, limit int, maxID string, minID string) ([]*gtsmodel.StatusBookmark, error)
+	GetStatusBookmarks(ctx context.Context, accountID string, page *paging.Page[string]) ([]*gtsmodel.StatusBookmark, error)
 
 	// PutStatusBookmark inserts the given statusBookmark into the database.
 	PutStatusBookmark(ctx context.Context, statusBookmark *gtsmodel.StatusBookmark) error

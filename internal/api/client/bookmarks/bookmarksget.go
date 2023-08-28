@@ -18,14 +18,13 @@
 package bookmarks
 
 import (
-	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	apiutil "github.com/superseriousbusiness/gotosocial/internal/api/util"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 const (
@@ -34,6 +33,7 @@ const (
 
 	// MaxIDKey is for specifying the maximum ID of the bookmark to retrieve.
 	MaxIDKey = "max_id"
+
 	// MinIDKey is for specifying the minimum ID of the bookmark to retrieve.
 	MinIDKey = "min_id"
 )
@@ -82,31 +82,28 @@ func (m *Module) BookmarksGETHandler(c *gin.Context) {
 		return
 	}
 
-	limit := 30
-	limitString := c.Query(LimitKey)
-	if limitString != "" {
-		i, err := strconv.ParseInt(limitString, 10, 64)
-		if err != nil {
-			err := fmt.Errorf("error parsing %s: %s", LimitKey, err)
-			apiutil.ErrorHandler(c, gtserror.NewErrorBadRequest(err, err.Error()), m.processor.InstanceGetV1)
-			return
-		}
-		limit = int(i)
+	// Parse limit from query string (if any).
+	limit, errWithCode := apiutil.ParseLimit(
+		c.Query("limit"),
+		40,
+		100,
+		2,
+	)
+	if errWithCode != nil {
+		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
+		return
 	}
 
-	maxID := ""
-	maxIDString := c.Query(MaxIDKey)
-	if maxIDString != "" {
-		maxID = maxIDString
-	}
-
-	minID := ""
-	minIDString := c.Query(MinIDKey)
-	if minIDString != "" {
-		minID = minIDString
-	}
-
-	resp, errWithCode := m.processor.Account().BookmarksGet(c.Request.Context(), authed.Account, limit, maxID, minID)
+	resp, errWithCode := m.processor.Account().BookmarksGet(
+		c.Request.Context(),
+		authed.Account,
+		&paging.Page[string]{
+			// Query provided paging values (note they may be empty).
+			Min:   paging.MinID(c.Query("min_id"), c.Query("since_id")),
+			Max:   paging.MaxID(c.Query("max_id")),
+			Limit: limit,
+		},
+	)
 	if errWithCode != nil {
 		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
 		return

@@ -27,6 +27,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // Emoji encompasses a set of
@@ -140,12 +141,17 @@ func (e *Emoji) UncacheRemote(ctx context.Context, olderThan time.Time) (int, er
 func (e *Emoji) FixBroken(ctx context.Context) (int, error) {
 	var (
 		total int
-		maxID string
+
+		// page for iterative emoji fetching
+		// from a previous maximum emoji ID.
+		page = paging.Page[string]{
+			Limit: selectLimit,
+		}
 	)
 
 	for {
 		// Fetch the next batch of emoji media up to next ID.
-		emojis, err := e.state.DB.GetEmojis(ctx, maxID, selectLimit)
+		emojis, err := e.state.DB.GetEmojis(ctx, &page)
 		if err != nil && !errors.Is(err, db.ErrNoEntries) {
 			return total, gtserror.Newf("error getting emojis: %w", err)
 		}
@@ -155,8 +161,8 @@ func (e *Emoji) FixBroken(ctx context.Context) (int, error) {
 			break
 		}
 
-		// Use last as the next 'maxID' value.
-		maxID = emojis[len(emojis)-1].ID
+		// Use last emoji as next page maxID value.
+		page.Max.Value = emojis[len(emojis)-1].ID
 
 		for _, emoji := range emojis {
 			// Check / fix missing broken emoji.
@@ -182,12 +188,17 @@ func (e *Emoji) FixBroken(ctx context.Context) (int, error) {
 func (e *Emoji) PruneUnused(ctx context.Context) (int, error) {
 	var (
 		total int
-		maxID string
+
+		// page for iterative emoji fetching
+		// from a previous maximum emoji ID.
+		page = paging.Page[string]{
+			Limit: selectLimit,
+		}
 	)
 
 	for {
 		// Fetch the next batch of emoji media up to next ID.
-		emojis, err := e.state.DB.GetRemoteEmojis(ctx, maxID, selectLimit)
+		emojis, err := e.state.DB.GetRemoteEmojis(ctx, &page)
 		if err != nil && !errors.Is(err, db.ErrNoEntries) {
 			return total, gtserror.Newf("error getting remote emojis: %w", err)
 		}
@@ -197,8 +208,8 @@ func (e *Emoji) PruneUnused(ctx context.Context) (int, error) {
 			break
 		}
 
-		// Use last as the next 'maxID' value.
-		maxID = emojis[len(emojis)-1].ID
+		// Use last emoji as next page maxID value.
+		page.Max.Value = emojis[len(emojis)-1].ID
 
 		for _, emoji := range emojis {
 			// Check / prune unused emoji media.
@@ -224,12 +235,17 @@ func (e *Emoji) PruneUnused(ctx context.Context) (int, error) {
 func (e *Emoji) FixCacheStates(ctx context.Context) (int, error) {
 	var (
 		total int
-		maxID string
+
+		// page for iterative emoji fetching
+		// from a previous maximum emoji ID.
+		page = paging.Page[string]{
+			Limit: selectLimit,
+		}
 	)
 
 	for {
 		// Fetch the next batch of emoji media up to next ID.
-		emojis, err := e.state.DB.GetRemoteEmojis(ctx, maxID, selectLimit)
+		emojis, err := e.state.DB.GetRemoteEmojis(ctx, &page)
 		if err != nil && !errors.Is(err, db.ErrNoEntries) {
 			return total, gtserror.Newf("error getting remote emojis: %w", err)
 		}
@@ -239,8 +255,8 @@ func (e *Emoji) FixCacheStates(ctx context.Context) (int, error) {
 			break
 		}
 
-		// Use last as the next 'maxID' value.
-		maxID = emojis[len(emojis)-1].ID
+		// Use last emoji as next page maxID value.
+		page.Max.Value = emojis[len(emojis)-1].ID
 
 		for _, emoji := range emojis {
 			// Check / fix required emoji cache states.

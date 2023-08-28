@@ -32,11 +32,11 @@ type PagingSuite struct {
 func (suite *PagingSuite) TestPagingStandard() {
 	config.SetHost("example.org")
 
-	params := paging.ResponseParams{
+	params := paging.ResponseParams[string]{
 		Items: make([]interface{}, 10, 10),
 		Path:  "/api/v1/accounts/01H11KA68PM4NNYJEG0FJQ90R3/statuses",
-		Next:  paging.NextPage("01H11KA1DM2VH3747YDE7FV5HN", 10),
-		Prev:  paging.PrevPage("01H11KBBVRRDYYC5KEPME1NP5R", 10),
+		Next:  nextPage("01H11KA1DM2VH3747YDE7FV5HN", 10),
+		Prev:  prevPage("01H11KBBVRRDYYC5KEPME1NP5R", 10),
 	}
 
 	resp := paging.PackageResponse(params)
@@ -50,11 +50,11 @@ func (suite *PagingSuite) TestPagingStandard() {
 func (suite *PagingSuite) TestPagingNoLimit() {
 	config.SetHost("example.org")
 
-	params := paging.ResponseParams{
+	params := paging.ResponseParams[string]{
 		Items: make([]interface{}, 10, 10),
 		Path:  "/api/v1/accounts/01H11KA68PM4NNYJEG0FJQ90R3/statuses",
-		Next:  paging.NextPage("01H11KA1DM2VH3747YDE7FV5HN", 0),
-		Prev:  paging.PrevPage("01H11KBBVRRDYYC5KEPME1NP5R", 0),
+		Next:  nextPage("01H11KA1DM2VH3747YDE7FV5HN", 0),
+		Prev:  prevPage("01H11KBBVRRDYYC5KEPME1NP5R", 0),
 	}
 
 	resp := paging.PackageResponse(params)
@@ -68,10 +68,10 @@ func (suite *PagingSuite) TestPagingNoLimit() {
 func (suite *PagingSuite) TestPagingNoNextID() {
 	config.SetHost("example.org")
 
-	params := paging.ResponseParams{
+	params := paging.ResponseParams[string]{
 		Items: make([]interface{}, 10, 10),
 		Path:  "/api/v1/accounts/01H11KA68PM4NNYJEG0FJQ90R3/statuses",
-		Prev:  paging.PrevPage("01H11KBBVRRDYYC5KEPME1NP5R", 10),
+		Prev:  prevPage("01H11KBBVRRDYYC5KEPME1NP5R", 10),
 	}
 
 	resp := paging.PackageResponse(params)
@@ -85,10 +85,10 @@ func (suite *PagingSuite) TestPagingNoNextID() {
 func (suite *PagingSuite) TestPagingNoPrevID() {
 	config.SetHost("example.org")
 
-	params := paging.ResponseParams{
+	params := paging.ResponseParams[string]{
 		Items: make([]interface{}, 10, 10),
 		Path:  "/api/v1/accounts/01H11KA68PM4NNYJEG0FJQ90R3/statuses",
-		Next:  paging.NextPage("01H11KA1DM2VH3747YDE7FV5HN", 10),
+		Next:  nextPage("01H11KA1DM2VH3747YDE7FV5HN", 10),
 	}
 
 	resp := paging.PackageResponse(params)
@@ -102,9 +102,9 @@ func (suite *PagingSuite) TestPagingNoPrevID() {
 func (suite *PagingSuite) TestPagingNoItems() {
 	config.SetHost("example.org")
 
-	params := paging.ResponseParams{
-		Next: paging.NextPage("01H11KA1DM2VH3747YDE7FV5HN", 10),
-		Prev: paging.PrevPage("01H11KBBVRRDYYC5KEPME1NP5R", 10),
+	params := paging.ResponseParams[string]{
+		Next: nextPage("01H11KA1DM2VH3747YDE7FV5HN", 10),
+		Prev: prevPage("01H11KBBVRRDYYC5KEPME1NP5R", 10),
 	}
 
 	resp := paging.PackageResponse(params)
@@ -117,4 +117,18 @@ func (suite *PagingSuite) TestPagingNoItems() {
 
 func TestPagingSuite(t *testing.T) {
 	suite.Run(t, &PagingSuite{})
+}
+
+func nextPage(id string, limit int) *paging.Page[string] {
+	return &paging.Page[string]{
+		Max:   paging.MaxID(id),
+		Limit: limit,
+	}
+}
+
+func prevPage(id string, limit int) *paging.Page[string] {
+	return &paging.Page[string]{
+		Min:   paging.MinID(id, ""),
+		Limit: limit,
+	}
 }

@@ -90,22 +90,20 @@ func (m *Module) FollowRequestGETHandler(c *gin.Context) {
 		100,
 		2,
 	)
-	if err != nil {
+	if errWithCode != nil {
 		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
 		return
 	}
 
 	// Fetch follow requesting accounts for the currently auth'd account.
-	accounts, errWithCode := m.processor.Account().FollowRequestsGet(
+	resp, errWithCode := m.processor.Account().FollowRequestsGet(
 		c.Request.Context(),
 		authed.Account,
-		&paging.Pager{
-			// Query provided paging values,
-			// it's okay for these to be empty.
-			SinceID: c.Query("since_id"),
-			MinID:   c.Query("min_id"),
-			MaxID:   c.Query("max_id"),
-			Limit:   limit,
+		&paging.Page[string]{
+			// Query provided paging values (note they may be empty).
+			Min:   paging.MinID(c.Query("min_id"), c.Query("since_id")),
+			Max:   paging.MaxID(c.Query("max_id")),
+			Limit: limit,
 		},
 	)
 	if errWithCode != nil {
@@ -113,5 +111,10 @@ func (m *Module) FollowRequestGETHandler(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, accounts)
+	if resp.LinkHeader != "" {
+		// Add paging link header if found.
+		c.Header("Link", resp.LinkHeader)
+	}
+
+	c.JSON(http.StatusOK, resp.Items)
 }

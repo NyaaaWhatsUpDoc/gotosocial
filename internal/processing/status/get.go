@@ -28,57 +28,49 @@ import (
 
 // Get gets the given status, taking account of privacy settings and blocks etc.
 func (p *Processor) Get(ctx context.Context, requestingAccount *gtsmodel.Account, targetStatusID string) (*apimodel.Status, gtserror.WithCode) {
-	targetStatus, errWithCode := p.getVisibleStatus(ctx, requestingAccount, targetStatusID)
+	targetStatus, errWithCode := p.c.GetVisibleTargetStatus(ctx, requestingAccount, targetStatusID)
 	if errWithCode != nil {
 		return nil, errWithCode
 	}
-
-	return p.apiStatus(ctx, targetStatus, requestingAccount)
+	return p.c.GetAPIStatus(ctx, requestingAccount, targetStatus)
 }
 
 // ContextGet returns the context (previous and following posts) from the given status ID.
 func (p *Processor) ContextGet(ctx context.Context, requestingAccount *gtsmodel.Account, targetStatusID string) (*apimodel.Context, gtserror.WithCode) {
-	targetStatus, errWithCode := p.getVisibleStatus(ctx, requestingAccount, targetStatusID)
+	targetStatus, errWithCode := p.c.GetVisibleTargetStatus(ctx, requestingAccount, targetStatusID)
 	if errWithCode != nil {
 		return nil, errWithCode
 	}
 
-	context := &apimodel.Context{
-		Ancestors:   []apimodel.Status{},
-		Descendants: []apimodel.Status{},
-	}
-
+	// Fetch parent statuses for the target status.
 	parents, err := p.state.DB.GetStatusParents(ctx, targetStatus, false)
 	if err != nil {
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
-	for _, status := range parents {
-		if v, err := p.filter.StatusVisible(ctx, requestingAccount, status); err == nil && v {
-			apiStatus, err := p.tc.StatusToAPIStatus(ctx, status, requestingAccount)
-			if err == nil {
-				context.Ancestors = append(context.Ancestors, *apiStatus)
-			}
-		}
-	}
-
-	sort.Slice(context.Ancestors, func(i int, j int) bool {
-		return context.Ancestors[i].ID < context.Ancestors[j].ID
+	// Ensure the status parents sorted by ID.
+	sort.Slice(parents, func(i int, j int) bool {
+		return parents[i].ID < parents[j].ID
 	})
 
+	// Convert parent statuses to frontend API models and filter for visibility to requester.
+	ancestors := p.c.GetVisibleAPIStatuses(ctx, requestingAccount, func(i int) *gtsmodel.Status {
+		return parents[i]
+	}, len(parents))
+
+	// Fetch child statuses for the target status.
 	children, err := p.state.DB.GetStatusChildren(ctx, targetStatus, false, "")
 	if err != nil {
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
-	for _, status := range children {
-		if v, err := p.filter.StatusVisible(ctx, requestingAccount, status); err == nil && v {
-			apiStatus, err := p.tc.StatusToAPIStatus(ctx, status, requestingAccount)
-			if err == nil {
-				context.Descendants = append(context.Descendants, *apiStatus)
-			}
-		}
-	}
+	// Convert child statuses to frontend API models and filter for visibility to requester.
+	descendents := p.c.GetVisibleAPIStatuses(ctx, requestingAccount, func(i int) *gtsmodel.Status {
+		return children[i]
+	}, len(children))
 
-	return context, nil
+	return &apimodel.Context{
+		Ancestors:   ancestors,
+		Descendants: descendents,
+	}, nil
 }

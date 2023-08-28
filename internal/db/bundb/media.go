@@ -27,6 +27,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
 	"github.com/uptrace/bun"
 )
@@ -200,7 +201,10 @@ func (m *mediaDB) DeleteAttachment(ctx context.Context, id string) error {
 	return err
 }
 
-func (m *mediaDB) GetAttachments(ctx context.Context, maxID string, limit int) ([]*gtsmodel.MediaAttachment, error) {
+func (m *mediaDB) GetAttachments(ctx context.Context, page *paging.Page[string]) ([]*gtsmodel.MediaAttachment, error) {
+	// Get limit (always >= 0).
+	limit, _ := page.GetLimit()
+
 	attachmentIDs := make([]string, 0, limit)
 
 	q := m.db.NewSelect().
@@ -208,11 +212,11 @@ func (m *mediaDB) GetAttachments(ctx context.Context, maxID string, limit int) (
 		Column("id").
 		Order("id DESC")
 
-	if maxID != "" {
+	if maxID, ok := page.GetMax(); ok {
 		q = q.Where("id < ?", maxID)
 	}
 
-	if limit != 0 {
+	if limit > 0 {
 		q = q.Limit(limit)
 	}
 
@@ -223,7 +227,10 @@ func (m *mediaDB) GetAttachments(ctx context.Context, maxID string, limit int) (
 	return m.GetAttachmentsByIDs(ctx, attachmentIDs)
 }
 
-func (m *mediaDB) GetRemoteAttachments(ctx context.Context, maxID string, limit int) ([]*gtsmodel.MediaAttachment, error) {
+func (m *mediaDB) GetRemoteAttachments(ctx context.Context, page *paging.Page[string]) ([]*gtsmodel.MediaAttachment, error) {
+	// Get limit (always >= 0).
+	limit, _ := page.GetLimit()
+
 	attachmentIDs := make([]string, 0, limit)
 
 	q := m.db.NewSelect().
@@ -232,11 +239,11 @@ func (m *mediaDB) GetRemoteAttachments(ctx context.Context, maxID string, limit 
 		Where("remote_url IS NOT NULL").
 		Order("id DESC")
 
-	if maxID != "" {
+	if maxID, ok := page.GetMax(); ok {
 		q = q.Where("id < ?", maxID)
 	}
 
-	if limit != 0 {
+	if limit > 0 {
 		q = q.Limit(limit)
 	}
 

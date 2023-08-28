@@ -21,17 +21,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
-	"github.com/superseriousbusiness/gotosocial/internal/id"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
 	"github.com/uptrace/bun"
-	"golang.org/x/exp/slices"
 )
 
 type timelineDB struct {
@@ -39,16 +37,19 @@ type timelineDB struct {
 	state *state.State
 }
 
-func (t *timelineDB) GetHomeTimeline(ctx context.Context, accountID string, maxID string, sinceID string, minID string, limit int, local bool) ([]*gtsmodel.Status, error) {
-	// Ensure reasonable
-	if limit < 0 {
-		limit = 0
-	}
-
-	// Make educated guess for slice size
+func (t *timelineDB) GetHomeTimeline(ctx context.Context, accountID string, page *paging.Page[string], local bool) ([]*gtsmodel.Status, error) {
 	var (
-		statusIDs   = make([]string, 0, limit)
-		frontToBack = true
+		// Get paging parameters.
+		minID, _ = page.GetMin()
+		maxID, _ = page.GetMax()
+		limit, _ = page.GetLimit()
+		order, _ = page.GetOrder()
+
+		// Make educated guess for slice size
+		statusIDs = make([]string, 0, limit)
+
+		// check requested return order based on paging
+		frontToBack = (order == paging.OrderAscending)
 	)
 
 	q := t.db.
@@ -57,32 +58,14 @@ func (t *timelineDB) GetHomeTimeline(ctx context.Context, accountID string, maxI
 		// Select only IDs from table
 		Column("status.id")
 
-	if maxID == "" || maxID >= id.Highest {
-		const future = 24 * time.Hour
-
-		var err error
-
-		// don't return statuses more than 24hr in the future
-		maxID, err = id.NewULIDFromTime(time.Now().Add(future))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// return only statuses LOWER (ie., older) than maxID
-	q = q.Where("? < ?", bun.Ident("status.id"), maxID)
-
-	if sinceID != "" {
-		// return only statuses HIGHER (ie., newer) than sinceID
-		q = q.Where("? > ?", bun.Ident("status.id"), sinceID)
+	if maxID != "" {
+		// return only statuses LOWER (ie., older) than maxID
+		q = q.Where("? < ?", bun.Ident("status.id"), maxID)
 	}
 
 	if minID != "" {
 		// return only statuses HIGHER (ie., newer) than minID
 		q = q.Where("? > ?", bun.Ident("status.id"), minID)
-
-		// page up
-		frontToBack = false
 	}
 
 	if local {
@@ -154,30 +137,24 @@ func (t *timelineDB) GetHomeTimeline(ctx context.Context, accountID string, maxI
 		}
 	}
 
-	statuses := make([]*gtsmodel.Status, 0, len(statusIDs))
-	for _, id := range statusIDs {
-		// Fetch status from db for ID
-		status, err := t.state.DB.GetStatusByID(ctx, id)
-		if err != nil {
-			log.Errorf(ctx, "error fetching status %q: %v", id, err)
-			continue
-		}
-
-		// Append status to slice
-		statuses = append(statuses, status)
-	}
-
-	return statuses, nil
+	// Fetch statuses for the fetched (+ sorted) IDs.
+	return t.state.DB.GetStatusesByIDs(ctx, statusIDs)
 }
 
-func (t *timelineDB) GetPublicTimeline(ctx context.Context, maxID string, sinceID string, minID string, limit int, local bool) ([]*gtsmodel.Status, error) {
-	// Ensure reasonable
-	if limit < 0 {
-		limit = 0
-	}
+func (t *timelineDB) GetPublicTimeline(ctx context.Context, page *paging.Page[string], local bool) ([]*gtsmodel.Status, error) {
+	var (
+		// Get paging parameters.
+		minID, _ = page.GetMin()
+		maxID, _ = page.GetMax()
+		limit, _ = page.GetLimit()
+		order, _ = page.GetOrder()
 
-	// Make educated guess for slice size
-	statusIDs := make([]string, 0, limit)
+		// Make educated guess for slice size
+		statusIDs = make([]string, 0, limit)
+
+		// check requested return order based on paging
+		frontToBack = (order == paging.OrderAscending)
+	)
 
 	q := t.db.
 		NewSelect().
@@ -186,202 +163,21 @@ func (t *timelineDB) GetPublicTimeline(ctx context.Context, maxID string, sinceI
 		// Public only.
 		Where("? = ?", bun.Ident("status.visibility"), gtsmodel.VisibilityPublic).
 		// Ignore boosts.
-		Where("? IS NULL", bun.Ident("status.boost_of_id")).
-		Order("status.id DESC")
-
-	if maxID == "" {
-		const future = 24 * time.Hour
-
-		var err error
-
-		// don't return statuses more than 24hr in the future
-		maxID, err = id.NewULIDFromTime(time.Now().Add(future))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// return only statuses LOWER (ie., older) than maxID
-	q = q.Where("? < ?", bun.Ident("status.id"), maxID)
-
-	if sinceID != "" {
-		q = q.Where("? > ?", bun.Ident("status.id"), sinceID)
-	}
-
-	if minID != "" {
-		q = q.Where("? > ?", bun.Ident("status.id"), minID)
-	}
-
-	if local {
-		q = q.Where("? = ?", bun.Ident("status.local"), local)
-	}
-
-	if limit > 0 {
-		q = q.Limit(limit)
-	}
-
-	if err := q.Scan(ctx, &statusIDs); err != nil {
-		return nil, err
-	}
-
-	statuses := make([]*gtsmodel.Status, 0, len(statusIDs))
-
-	for _, id := range statusIDs {
-		// Fetch status from db for ID
-		status, err := t.state.DB.GetStatusByID(ctx, id)
-		if err != nil {
-			log.Errorf(ctx, "error fetching status %q: %v", id, err)
-			continue
-		}
-
-		// Append status to slice
-		statuses = append(statuses, status)
-	}
-
-	return statuses, nil
-}
-
-// TODO optimize this query and the logic here, because it's slow as balls -- it takes like a literal second to return with a limit of 20!
-// It might be worth serving it through a timeline instead of raw DB queries, like we do for Home feeds.
-func (t *timelineDB) GetFavedTimeline(ctx context.Context, accountID string, maxID string, minID string, limit int) ([]*gtsmodel.Status, string, string, error) {
-	// Ensure reasonable
-	if limit < 0 {
-		limit = 0
-	}
-
-	// Make educated guess for slice size
-	faves := make([]*gtsmodel.StatusFave, 0, limit)
-
-	fq := t.db.
-		NewSelect().
-		Model(&faves).
-		Where("? = ?", bun.Ident("status_fave.account_id"), accountID).
-		Order("status_fave.id DESC")
+		Where("? IS NULL", bun.Ident("status.boost_of_id"))
 
 	if maxID != "" {
-		fq = fq.Where("? < ?", bun.Ident("status_fave.id"), maxID)
-	}
-
-	if minID != "" {
-		fq = fq.Where("? > ?", bun.Ident("status_fave.id"), minID)
-	}
-
-	if limit > 0 {
-		fq = fq.Limit(limit)
-	}
-
-	err := fq.Scan(ctx)
-	if err != nil {
-		return nil, "", "", err
-	}
-
-	if len(faves) == 0 {
-		return nil, "", "", db.ErrNoEntries
-	}
-
-	// Sort by favourite ID rather than status ID
-	slices.SortFunc(faves, func(a, b *gtsmodel.StatusFave) bool {
-		return a.ID > b.ID
-	})
-
-	statuses := make([]*gtsmodel.Status, 0, len(faves))
-
-	for _, fave := range faves {
-		// Fetch status from db for corresponding favourite
-		status, err := t.state.DB.GetStatusByID(ctx, fave.StatusID)
-		if err != nil {
-			log.Errorf(ctx, "error fetching status for fave %q: %v", fave.ID, err)
-			continue
-		}
-
-		// Append status to slice
-		statuses = append(statuses, status)
-	}
-
-	nextMaxID := faves[len(faves)-1].ID
-	prevMinID := faves[0].ID
-	return statuses, nextMaxID, prevMinID, nil
-}
-
-func (t *timelineDB) GetListTimeline(
-	ctx context.Context,
-	listID string,
-	maxID string,
-	sinceID string,
-	minID string,
-	limit int,
-) ([]*gtsmodel.Status, error) {
-	// Ensure reasonable
-	if limit < 0 {
-		limit = 0
-	}
-
-	// Make educated guess for slice size
-	var (
-		statusIDs   = make([]string, 0, limit)
-		frontToBack = true
-	)
-
-	// Fetch all listEntries entries from the database.
-	listEntries, err := t.state.DB.GetListEntries(
-		// Don't need actual follows
-		// for this, just the IDs.
-		gtscontext.SetBarebones(ctx),
-		listID,
-		"", "", "", 0,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error getting entries for list %s: %w", listID, err)
-	}
-
-	// Extract just the IDs of each follow.
-	followIDs := make([]string, 0, len(listEntries))
-	for _, listEntry := range listEntries {
-		followIDs = append(followIDs, listEntry.FollowID)
-	}
-
-	// Select target account IDs from follows.
-	subQ := t.db.
-		NewSelect().
-		TableExpr("? AS ?", bun.Ident("follows"), bun.Ident("follow")).
-		Column("follow.target_account_id").
-		Where("? IN (?)", bun.Ident("follow.id"), bun.In(followIDs))
-
-	// Select only status IDs created
-	// by one of the followed accounts.
-	q := t.db.
-		NewSelect().
-		TableExpr("? AS ?", bun.Ident("statuses"), bun.Ident("status")).
-		// Select only IDs from table
-		Column("status.id").
-		Where("? IN (?)", bun.Ident("status.account_id"), subQ)
-
-	if maxID == "" || maxID >= id.Highest {
-		const future = 24 * time.Hour
-
-		var err error
-
-		// don't return statuses more than 24hr in the future
-		maxID, err = id.NewULIDFromTime(time.Now().Add(future))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// return only statuses LOWER (ie., older) than maxID
-	q = q.Where("? < ?", bun.Ident("status.id"), maxID)
-
-	if sinceID != "" {
-		// return only statuses HIGHER (ie., newer) than sinceID
-		q = q.Where("? > ?", bun.Ident("status.id"), sinceID)
+		// return only statuses LOWER (ie., older) than maxID
+		q = q.Where("? < ?", bun.Ident("status.id"), maxID)
 	}
 
 	if minID != "" {
 		// return only statuses HIGHER (ie., newer) than minID
 		q = q.Where("? > ?", bun.Ident("status.id"), minID)
+	}
 
-		// page up
-		frontToBack = false
+	if local {
+		// return only statuses posted by local account havers
+		q = q.Where("? = ?", bun.Ident("status.local"), local)
 	}
 
 	if limit > 0 {
@@ -414,39 +210,208 @@ func (t *timelineDB) GetListTimeline(
 		}
 	}
 
-	statuses := make([]*gtsmodel.Status, 0, len(statusIDs))
-	for _, id := range statusIDs {
-		// Fetch status from db for ID
-		status, err := t.state.DB.GetStatusByID(ctx, id)
-		if err != nil {
-			log.Errorf(ctx, "error fetching status %q: %v", id, err)
-			continue
-		}
+	// Fetch statuses for the fetched (+ sorted) IDs.
+	return t.state.DB.GetStatusesByIDs(ctx, statusIDs)
+}
 
-		// Append status to slice
-		statuses = append(statuses, status)
+// TODO optimize this query and the logic here, because it's slow as balls -- it takes like a literal second to return with a limit of 20!
+// It might be worth serving it through a timeline instead of raw DB queries, like we do for Home feeds.
+func (t *timelineDB) GetFavedTimeline(ctx context.Context, accountID string, page *paging.Page[string]) ([]*gtsmodel.StatusFave, error) {
+	var (
+		// Get paging parameters.
+		minID, _ = page.GetMin()
+		maxID, _ = page.GetMax()
+		limit, _ = page.GetLimit()
+		order, _ = page.GetOrder()
+
+		// Make educated guess for slice size
+		faveIDs = make([]string, 0, limit)
+
+		// check requested return order based on paging
+		frontToBack = (order == paging.OrderAscending)
+	)
+
+	fq := t.db.
+		NewSelect().
+		Model(&faveIDs).
+		Table("status_faves").
+		Column("id").
+		Where("? = ?", bun.Ident("account_id"), accountID).
+		Order("id DESC")
+
+	if maxID != "" {
+		// return only status faves LOWER (ie., older) than maxID
+		fq = fq.Where("? < ?", bun.Ident("status_fave.id"), maxID)
 	}
 
-	return statuses, nil
+	if minID != "" {
+		// return only status faves HIGHER (ie., newer) than minID
+		fq = fq.Where("? > ?", bun.Ident("status_fave.id"), minID)
+	}
+
+	if limit > 0 {
+		// limit amount of faves returned
+		fq = fq.Limit(limit)
+	}
+
+	if frontToBack {
+		// Page down.
+		fq = fq.Order("status.id DESC")
+	} else {
+		// Page up.
+		fq = fq.Order("status.id ASC")
+	}
+
+	err := fq.Scan(ctx, &faveIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(faveIDs) == 0 {
+		return nil, db.ErrNoEntries
+	}
+
+	// If we're paging up, we still want faves
+	// to be sorted by ID desc, so reverse ids slice.
+	// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
+	if !frontToBack {
+		for l, r := 0, len(faveIDs)-1; l < r; l, r = l+1, r-1 {
+			faveIDs[l], faveIDs[r] = faveIDs[r], faveIDs[l]
+		}
+	}
+
+	// Fetch favourite models for all of the IDs.
+	faves := make([]*gtsmodel.StatusFave, 0, len(faveIDs))
+	for _, id := range faveIDs {
+		fave, err := t.state.DB.GetStatusFaveByID(
+			// we only need a barebones model.
+			gtscontext.SetBarebones(ctx),
+			id,
+		)
+		if err != nil {
+			log.Errorf(ctx, "error getting status fave: %v", err)
+			continue
+		}
+		faves = append(faves, fave)
+	}
+
+	return faves, nil
+}
+
+func (t *timelineDB) GetListTimeline(
+	ctx context.Context,
+	listID string,
+	page *paging.Page[string],
+) ([]*gtsmodel.Status, error) {
+	var (
+		// Get paging parameters.
+		minID, _ = page.GetMin()
+		maxID, _ = page.GetMax()
+		limit, _ = page.GetLimit()
+		order, _ = page.GetOrder()
+
+		// Make educated guess for slice size
+		statusIDs = make([]string, 0, limit)
+
+		// check requested return order based on paging
+		frontToBack = (order == paging.OrderAscending)
+	)
+
+	// Fetch all listEntries entries from the database.
+	listEntries, err := t.state.DB.GetListEntries(
+		// Don't need actual follows
+		// for this, just the IDs.
+		gtscontext.SetBarebones(ctx),
+		listID,
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error getting entries for list %s: %w", listID, err)
+	}
+
+	// Extract just the IDs of each follow.
+	followIDs := make([]string, 0, len(listEntries))
+	for _, listEntry := range listEntries {
+		followIDs = append(followIDs, listEntry.FollowID)
+	}
+
+	// Select target account IDs from follows.
+	subQ := t.db.
+		NewSelect().
+		TableExpr("? AS ?", bun.Ident("follows"), bun.Ident("follow")).
+		Column("follow.target_account_id").
+		Where("? IN (?)", bun.Ident("follow.id"), bun.In(followIDs))
+
+	// Select only status IDs created
+	// by one of the followed accounts.
+	q := t.db.
+		NewSelect().
+		TableExpr("? AS ?", bun.Ident("statuses"), bun.Ident("status")).
+		// Select only IDs from table
+		Column("status.id").
+		Where("? IN (?)", bun.Ident("status.account_id"), subQ)
+
+	if maxID != "" {
+		// return only statuses LOWER (ie., older) than maxID
+		q = q.Where("? < ?", bun.Ident("status.id"), maxID)
+	}
+
+	if minID != "" {
+		// return only statuses HIGHER (ie., newer) than minID
+		q = q.Where("? > ?", bun.Ident("status.id"), minID)
+	}
+
+	if limit > 0 {
+		// limit amount of statuses returned
+		q = q.Limit(limit)
+	}
+
+	if frontToBack {
+		// Page down.
+		q = q.Order("status.id DESC")
+	} else {
+		// Page up.
+		q = q.Order("status.id ASC")
+	}
+
+	if err := q.Scan(ctx, &statusIDs); err != nil {
+		return nil, err
+	}
+
+	if len(statusIDs) == 0 {
+		return nil, nil
+	}
+
+	// If we're paging up, we still want statuses
+	// to be sorted by ID desc, so reverse ids slice.
+	// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
+	if !frontToBack {
+		for l, r := 0, len(statusIDs)-1; l < r; l, r = l+1, r-1 {
+			statusIDs[l], statusIDs[r] = statusIDs[r], statusIDs[l]
+		}
+	}
+
+	// Fetch statuses for the fetched (+ sorted) IDs.
+	return t.state.DB.GetStatusesByIDs(ctx, statusIDs)
 }
 
 func (t *timelineDB) GetTagTimeline(
 	ctx context.Context,
 	tagID string,
-	maxID string,
-	sinceID string,
-	minID string,
-	limit int,
+	page *paging.Page[string],
 ) ([]*gtsmodel.Status, error) {
-	// Ensure reasonable
-	if limit < 0 {
-		limit = 0
-	}
-
-	// Make educated guess for slice size
 	var (
-		statusIDs   = make([]string, 0, limit)
-		frontToBack = true
+		// Get paging parameters.
+		minID, _ = page.GetMin()
+		maxID, _ = page.GetMax()
+		limit, _ = page.GetLimit()
+		order, _ = page.GetOrder()
+
+		// Make educated guess for slice size
+		statusIDs = make([]string, 0, limit)
+
+		// check requested return order based on paging
+		frontToBack = (order == paging.OrderAscending)
 	)
 
 	q := t.db.
@@ -464,32 +429,14 @@ func (t *timelineDB) GetTagTimeline(
 		// This tag only.
 		Where("? = ?", bun.Ident("status_to_tag.tag_id"), tagID)
 
-	if maxID == "" || maxID >= id.Highest {
-		const future = 24 * time.Hour
-
-		var err error
-
-		// don't return statuses more than 24hr in the future
-		maxID, err = id.NewULIDFromTime(time.Now().Add(future))
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// return only statuses LOWER (ie., older) than maxID
-	q = q.Where("? < ?", bun.Ident("status_to_tag.status_id"), maxID)
-
-	if sinceID != "" {
-		// return only statuses HIGHER (ie., newer) than sinceID
-		q = q.Where("? > ?", bun.Ident("status_to_tag.status_id"), sinceID)
+	if maxID != "" {
+		// return only statuses LOWER (ie., older) than maxID
+		q = q.Where("? < ?", bun.Ident("status_to_tag.status_id"), maxID)
 	}
 
 	if minID != "" {
 		// return only statuses HIGHER (ie., newer) than minID
 		q = q.Where("? > ?", bun.Ident("status_to_tag.status_id"), minID)
-
-		// page up
-		frontToBack = false
 	}
 
 	if limit > 0 {
@@ -522,18 +469,6 @@ func (t *timelineDB) GetTagTimeline(
 		}
 	}
 
-	statuses := make([]*gtsmodel.Status, 0, len(statusIDs))
-	for _, id := range statusIDs {
-		// Fetch status from db for ID
-		status, err := t.state.DB.GetStatusByID(ctx, id)
-		if err != nil {
-			log.Errorf(ctx, "error fetching status %q: %v", id, err)
-			continue
-		}
-
-		// Append status to slice
-		statuses = append(statuses, status)
-	}
-
-	return statuses, nil
+	// Fetch statuses for the fetched (+ sorted) IDs.
+	return t.state.DB.GetStatusesByIDs(ctx, statusIDs)
 }

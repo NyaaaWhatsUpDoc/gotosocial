@@ -25,49 +25,54 @@ import (
 	apimodel "github.com/superseriousbusiness/gotosocial/internal/api/model"
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
+	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
-	"github.com/superseriousbusiness/gotosocial/internal/util"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
-func (p *Processor) FavedTimelineGet(ctx context.Context, authed *oauth.Auth, maxID string, minID string, limit int) (*apimodel.PageableResponse, gtserror.WithCode) {
-	statuses, nextMaxID, prevMinID, err := p.state.DB.GetFavedTimeline(ctx, authed.Account.ID, maxID, minID, limit)
+func (p *Processor) FavedTimelineGet(ctx context.Context, authed *oauth.Auth, page *paging.Page[string]) (*apimodel.PageableResponse, gtserror.WithCode) {
+	faves, err := p.state.DB.GetFavedTimeline(ctx, authed.Account.ID, page)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
 		err = fmt.Errorf("FavedTimelineGet: db error getting statuses: %w", err)
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
-	count := len(statuses)
+	count := len(faves)
 	if count == 0 {
-		return util.EmptyPageableResponse(), nil
+		return paging.EmptyResponse(), nil
 	}
 
-	items := make([]interface{}, 0, count)
-	for _, s := range statuses {
-		visible, err := p.filter.StatusVisible(ctx, authed.Account, s)
+	// Func to fetch relevant status for fave at index.
+	getFaveStatusIdx := func(i int) *gtsmodel.Status {
+		statusID := faves[i].StatusID
+
+		// NOTE: passing in an anonymous function here that is expected
+		// to access members of a slice, but instead converts on-the-fly
+		// favourites -> statuses isn't *ideal*. Buuuuuuut the alternative
+		// is converting all the favourites to a slice of status IDs, fetching
+		// all of those as statuses, then finally performing this same code
+		// minus the `GetStatusByID()`. So this way ends up more concise.
+		status, err := p.state.DB.GetStatusByID(ctx, statusID)
 		if err != nil {
-			log.Errorf(ctx, "error checking status visibility: %v", err)
-			continue
+			log.Errorf(ctx, "error getting status for fave: %v", err)
+			return nil
 		}
 
-		if !visible {
-			continue
-		}
-
-		apiStatus, err := p.tc.StatusToAPIStatus(ctx, s, authed.Account)
-		if err != nil {
-			log.Errorf(ctx, "error convering to api status: %v", err)
-			continue
-		}
-
-		items = append(items, apiStatus)
+		return status
 	}
 
-	return util.PackagePageableResponse(util.PageableResponseParams{
-		Items:          items,
-		Path:           "/api/v1/favourites",
-		NextMaxIDValue: nextMaxID,
-		PrevMinIDValue: prevMinID,
-		Limit:          limit,
-	})
+	// Get a filtered slice of frontend API status models.
+	items, minID, maxID := p.c.GetVisibleAPIStatusesPaged(ctx,
+		authed.Account,
+		getFaveStatusIdx,
+		len(faves),
+	)
+
+	return paging.PackageResponse(paging.ResponseParams[string]{
+		Items: items,
+		Path:  "/api/v1/favourites",
+		Next:  page.Next(maxID),
+		Prev:  page.Prev(minID),
+	}), nil
 }

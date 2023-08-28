@@ -24,8 +24,8 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
-	"github.com/superseriousbusiness/gotosocial/internal/id"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
 	"github.com/uptrace/bun"
 )
@@ -78,21 +78,21 @@ func (n *notificationDB) GetNotification(
 func (n *notificationDB) GetAccountNotifications(
 	ctx context.Context,
 	accountID string,
-	maxID string,
-	sinceID string,
-	minID string,
-	limit int,
+	page *paging.Page[string],
 	excludeTypes []string,
 ) ([]*gtsmodel.Notification, error) {
-	// Ensure reasonable
-	if limit < 0 {
-		limit = 0
-	}
-
-	// Make educated guess for slice size
 	var (
-		notifIDs    = make([]string, 0, limit)
-		frontToBack = true
+		// Get paging parameters.
+		minID, _ = page.GetMin()
+		maxID, _ = page.GetMax()
+		limit, _ = page.GetLimit()
+		order, _ = page.GetOrder()
+
+		// Make educated guess for slice size
+		notifIDs = make([]string, 0, limit)
+
+		// check requested return order based on paging
+		frontToBack = (order == paging.OrderAscending)
 	)
 
 	q := n.db.
@@ -100,23 +100,18 @@ func (n *notificationDB) GetAccountNotifications(
 		TableExpr("? AS ?", bun.Ident("notifications"), bun.Ident("notification")).
 		Column("notification.id")
 
-	if maxID == "" {
-		maxID = id.Highest
-	}
-
-	// Return only notifs LOWER (ie., older) than maxID.
-	q = q.Where("? < ?", bun.Ident("notification.id"), maxID)
-
-	if sinceID != "" {
-		// Return only notifs HIGHER (ie., newer) than sinceID.
-		q = q.Where("? > ?", bun.Ident("notification.id"), sinceID)
+	if maxID != "" {
+		// Return only notifs LOWER (ie., older) than maxID.
+		q = q.Where("? < ?", bun.Ident("notification.id"), maxID)
 	}
 
 	if minID != "" {
 		// Return only notifs HIGHER (ie., newer) than minID.
 		q = q.Where("? > ?", bun.Ident("notification.id"), minID)
+	}
 
-		frontToBack = false // page up
+	if limit > 0 {
+		q = q.Limit(limit)
 	}
 
 	for _, excludeType := range excludeTypes {
@@ -126,10 +121,6 @@ func (n *notificationDB) GetAccountNotifications(
 
 	// Return only notifs for this account.
 	q = q.Where("? = ?", bun.Ident("notification.target_account_id"), accountID)
-
-	if limit > 0 {
-		q = q.Limit(limit)
-	}
 
 	if frontToBack {
 		// Page down.

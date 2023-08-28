@@ -25,6 +25,7 @@ import (
 	apiutil "github.com/superseriousbusiness/gotosocial/internal/api/util"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // ListAccountsGETHandler swagger:operation GET /api/v1/lists/{id}/accounts listAccounts
@@ -134,37 +135,31 @@ func (m *Module) ListAccountsGETHandler(c *gin.Context) {
 		return
 	}
 
-	limit, errWithCode := apiutil.ParseLimit(c.Query(apiutil.LimitKey), 40, 80, 0)
+	// Parse limit from query string (if any).
+	limit, errWithCode := apiutil.ParseLimit(
+		c.Query("limit"),
+		40,
+		80,
+		2,
+	)
 	if errWithCode != nil {
 		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
 		return
 	}
 
-	var (
-		ctx = c.Request.Context()
-	)
-
-	if limit == 0 {
-		// Return all accounts in the list without pagination.
-		accounts, errWithCode := m.processor.List().GetAllListAccounts(ctx, authed.Account, targetListID)
-		if errWithCode != nil {
-			apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
-			return
-		}
-
-		c.JSON(http.StatusOK, accounts)
-		return
-	}
+	ctx := c.Request.Context()
 
 	// Return subset of accounts in the list with pagination.
 	resp, errWithCode := m.processor.List().GetListAccounts(
 		ctx,
 		authed.Account,
 		targetListID,
-		c.Query(MaxIDKey),
-		c.Query(SinceIDKey),
-		c.Query(MinIDKey),
-		limit,
+		&paging.Page[string]{
+			// Query provided paging values (note they may be empty).
+			Min:   paging.MinID(c.Query("min_id"), c.Query("since_id")),
+			Max:   paging.MaxID(c.Query("max_id")),
+			Limit: limit,
+		},
 	)
 	if errWithCode != nil {
 		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
@@ -172,7 +167,9 @@ func (m *Module) ListAccountsGETHandler(c *gin.Context) {
 	}
 
 	if resp.LinkHeader != "" {
+		// Add paging link header if found.
 		c.Header("Link", resp.LinkHeader)
 	}
+
 	c.JSON(http.StatusOK, resp.Items)
 }

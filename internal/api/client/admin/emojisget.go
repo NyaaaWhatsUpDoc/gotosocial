@@ -20,7 +20,6 @@ package admin
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -29,6 +28,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // EmojisGETHandler swagger:operation GET /api/v1/admin/custom_emojis emojisGet
@@ -142,25 +142,23 @@ func (m *Module) EmojisGETHandler(c *gin.Context) {
 	maxShortcodeDomain := c.Query(MaxShortcodeDomainKey)
 	minShortcodeDomain := c.Query(MinShortcodeDomainKey)
 
-	limit := 50
-	limitString := c.Query(LimitKey)
-	if limitString != "" {
-		i, err := strconv.ParseInt(limitString, 10, 32)
-		if err != nil {
-			err := fmt.Errorf("error parsing %s: %s", LimitKey, err)
-			apiutil.ErrorHandler(c, gtserror.NewErrorBadRequest(err, err.Error()), m.processor.InstanceGetV1)
-			return
-		}
-		limit = int(i)
-	}
-	if limit < 0 {
-		limit = 0
+	// Parse limit from query string (if any).
+	limit, errWithCode := apiutil.ParseLimit(
+		c.Query("limit"),
+		40,
+		100,
+		2,
+	)
+	if errWithCode != nil {
+		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
+		return
 	}
 
 	var domain string
 	var includeDisabled bool
 	var includeEnabled bool
 	var shortcode string
+
 	if filterParam := c.Query(FilterQueryKey); filterParam != "" {
 		filters := strings.Split(filterParam, ",")
 		for _, filter := range filters {
@@ -197,7 +195,21 @@ func (m *Module) EmojisGETHandler(c *gin.Context) {
 		includeEnabled = true
 	}
 
-	resp, errWithCode := m.processor.Admin().EmojisGet(c.Request.Context(), authed.Account, authed.User, domain, includeDisabled, includeEnabled, shortcode, maxShortcodeDomain, minShortcodeDomain, limit)
+	resp, errWithCode := m.processor.Admin().EmojisGet(
+		c.Request.Context(),
+		authed.Account,
+		authed.User,
+		domain,
+		includeDisabled,
+		includeEnabled,
+		shortcode,
+		&paging.Page[string]{
+			// Query provided paging values (note they may be empty).
+			Min:   paging.MinShortcodeDomain(minShortcodeDomain),
+			Max:   paging.MaxShortcodeDomain(maxShortcodeDomain),
+			Limit: limit,
+		},
+	)
 	if errWithCode != nil {
 		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
 		return

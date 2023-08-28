@@ -27,18 +27,17 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
 	"github.com/superseriousbusiness/gotosocial/internal/paging"
-	"github.com/superseriousbusiness/gotosocial/internal/util"
 )
 
 // BlocksGet ...
 func (p *Processor) BlocksGet(
 	ctx context.Context,
 	requestingAccount *gtsmodel.Account,
-	page paging.Pager,
+	page *paging.Page[string],
 ) (*apimodel.PageableResponse, gtserror.WithCode) {
 	blocks, err := p.state.DB.GetAccountBlocks(ctx,
 		requestingAccount.ID,
-		&page,
+		page,
 	)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
 		return nil, gtserror.NewErrorInternalError(err)
@@ -47,7 +46,7 @@ func (p *Processor) BlocksGet(
 	// Check for zero length.
 	count := len(blocks)
 	if len(blocks) == 0 {
-		return util.EmptyPageableResponse(), nil
+		return paging.EmptyResponse(), nil
 	}
 
 	var (
@@ -77,13 +76,10 @@ func (p *Processor) BlocksGet(
 		items = append(items, account)
 	}
 
-	return util.PackagePageableResponse(util.PageableResponseParams{
-		Items:          items,
-		Path:           "/api/v1/blocks",
-		NextMaxIDKey:   "max_id",
-		PrevMinIDKey:   "since_id",
-		NextMaxIDValue: nextMaxIDValue,
-		PrevMinIDValue: prevMinIDValue,
-		Limit:          page.Limit,
-	})
+	return paging.PackageResponse(paging.ResponseParams[string]{
+		Items: items,
+		Path:  "/api/v1/blocks",
+		Next:  page.Next(nextMaxIDValue),
+		Prev:  page.Prev(prevMinIDValue),
+	}), nil
 }

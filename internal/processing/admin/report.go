@@ -29,7 +29,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/messages"
-	"github.com/superseriousbusiness/gotosocial/internal/util"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // ReportsGet returns all reports stored on this instance, with the given parameters.
@@ -39,15 +39,12 @@ func (p *Processor) ReportsGet(
 	resolved *bool,
 	accountID string,
 	targetAccountID string,
-	maxID string,
-	sinceID string,
-	minID string,
-	limit int,
+	page *paging.Page[string],
 ) (*apimodel.PageableResponse, gtserror.WithCode) {
-	reports, err := p.state.DB.GetReports(ctx, resolved, accountID, targetAccountID, maxID, sinceID, minID, limit)
+	reports, err := p.state.DB.GetReports(ctx, resolved, accountID, targetAccountID, page)
 	if err != nil {
 		if err == db.ErrNoEntries {
-			return util.EmptyPageableResponse(), nil
+			return paging.EmptyResponse(), nil
 		}
 		return nil, gtserror.NewErrorInternalError(err)
 	}
@@ -76,14 +73,13 @@ func (p *Processor) ReportsGet(
 		extraQueryParams = append(extraQueryParams, "target_account_id="+targetAccountID)
 	}
 
-	return util.PackagePageableResponse(util.PageableResponseParams{
-		Items:            items,
-		Path:             "/api/v1/admin/reports",
-		NextMaxIDValue:   nextMaxIDValue,
-		PrevMinIDValue:   prevMinIDValue,
-		Limit:            limit,
-		ExtraQueryParams: extraQueryParams,
-	})
+	return paging.PackageResponse(paging.ResponseParams[string]{
+		Items: items,
+		Path:  "/api/v1/admin/reports",
+		Next:  page.Next(nextMaxIDValue),
+		Prev:  page.Prev(prevMinIDValue),
+		Query: extraQueryParams,
+	}), nil
 }
 
 // ReportGet returns one report, with the given ID.

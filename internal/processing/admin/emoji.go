@@ -31,6 +31,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/id"
 	"github.com/superseriousbusiness/gotosocial/internal/media"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/uris"
 	"github.com/superseriousbusiness/gotosocial/internal/util"
 )
@@ -101,15 +102,13 @@ func (p *Processor) EmojisGet(
 	includeDisabled bool,
 	includeEnabled bool,
 	shortcode string,
-	maxShortcodeDomain string,
-	minShortcodeDomain string,
-	limit int,
+	page *paging.Page[string],
 ) (*apimodel.PageableResponse, gtserror.WithCode) {
 	if !*user.Admin {
 		return nil, gtserror.NewErrorUnauthorized(fmt.Errorf("user %s not an admin", user.ID), "user is not an admin")
 	}
 
-	emojis, err := p.state.DB.GetEmojisBy(ctx, domain, includeDisabled, includeEnabled, shortcode, maxShortcodeDomain, minShortcodeDomain, limit)
+	emojis, err := p.state.DB.GetEmojisBy(ctx, domain, includeDisabled, includeEnabled, shortcode, page)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
 		err := fmt.Errorf("EmojisGet: db error: %s", err)
 		return nil, gtserror.NewErrorInternalError(err)
@@ -117,7 +116,7 @@ func (p *Processor) EmojisGet(
 
 	count := len(emojis)
 	if count == 0 {
-		return util.EmptyPageableResponse(), nil
+		return paging.EmptyResponse(), nil
 	}
 
 	items := make([]interface{}, 0, count)
@@ -157,16 +156,17 @@ func (p *Processor) EmojisGet(
 		filterBuilder.WriteString(shortcode)
 	}
 
-	return util.PackagePageableResponse(util.PageableResponseParams{
-		Items:            items,
-		Path:             "api/v1/admin/custom_emojis",
-		NextMaxIDKey:     "max_shortcode_domain",
-		NextMaxIDValue:   util.ShortcodeDomain(emojis[count-1]),
-		PrevMinIDKey:     "min_shortcode_domain",
-		PrevMinIDValue:   util.ShortcodeDomain(emojis[0]),
-		Limit:            limit,
-		ExtraQueryParams: []string{filterBuilder.String()},
-	})
+	// Calculate next / prev page shortcode domain values.
+	nextMaxShortcodeDomain := util.ShortcodeDomain(emojis[count-1])
+	prevMinShortcodeDomain := util.ShortcodeDomain(emojis[0])
+
+	return paging.PackageResponse(paging.ResponseParams[string]{
+		Items: items,
+		Path:  "api/v1/admin/custom_emojis",
+		Next:  page.Next(nextMaxShortcodeDomain),
+		Prev:  page.Prev(prevMinShortcodeDomain),
+		Query: []string{filterBuilder.String()},
+	}), nil
 }
 
 // EmojiGet returns the admin view of one custom emoji with the given id.

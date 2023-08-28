@@ -27,6 +27,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/ap"
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // InboxPost handles POST requests to a user's inbox for new activitypub messages.
@@ -45,7 +46,7 @@ func (p *Processor) InboxPost(ctx context.Context, w http.ResponseWriter, r *htt
 
 // OutboxGet returns the activitypub representation of a local user's outbox.
 // This contains links to PUBLIC posts made by this user.
-func (p *Processor) OutboxGet(ctx context.Context, requestedUsername string, page bool, maxID string, minID string) (interface{}, gtserror.WithCode) {
+func (p *Processor) OutboxGet(ctx context.Context, requestedUsername string, page *paging.Page[string]) (interface{}, gtserror.WithCode) {
 	requestedAccount, _, errWithCode := p.authenticate(ctx, requestedUsername)
 	if errWithCode != nil {
 		return nil, errWithCode
@@ -56,7 +57,7 @@ func (p *Processor) OutboxGet(ctx context.Context, requestedUsername string, pag
 	// 1. we're asked for the whole collection and not a page -- we can just return the collection, with no items, but a link to 'first' page.
 	// 2. we're asked for a specific page; this can be either the first page or any other page
 
-	if !page {
+	if page == nil {
 		/*
 			scenario 1: return the collection with no items
 			we want something that looks like this:
@@ -83,15 +84,16 @@ func (p *Processor) OutboxGet(ctx context.Context, requestedUsername string, pag
 
 	// scenario 2 -- get the requested page
 	// limit pages to 30 entries per page
-	publicStatuses, err := p.state.DB.GetAccountStatuses(ctx, requestedAccount.ID, 30, true, true, maxID, minID, false, true)
+	publicStatuses, err := p.state.DB.GetAccountStatuses(ctx, requestedAccount.ID, page, true, true, false, true)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
-	outboxPage, err := p.tc.StatusesToASOutboxPage(ctx, requestedAccount.OutboxURI, maxID, minID, publicStatuses)
+	outboxPage, err := p.tc.StatusesToASOutboxPage(ctx, requestedAccount.OutboxURI, page, publicStatuses)
 	if err != nil {
 		return nil, gtserror.NewErrorInternalError(err)
 	}
+
 	data, err = ap.Serialize(outboxPage)
 	if err != nil {
 		return nil, gtserror.NewErrorInternalError(err)
