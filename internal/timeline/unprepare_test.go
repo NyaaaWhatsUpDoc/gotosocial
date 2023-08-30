@@ -26,6 +26,7 @@ import (
 	apimodel "github.com/superseriousbusiness/gotosocial/internal/api/model"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/id"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 type UnprepareTestSuite struct {
@@ -49,10 +50,7 @@ func (suite *UnprepareTestSuite) TestUnprepareFromFave() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -85,10 +83,7 @@ func (suite *UnprepareTestSuite) TestUnprepareFromFave() {
 	statuses, err = suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -117,10 +112,7 @@ func (suite *UnprepareTestSuite) TestUnprepareFromFave() {
 	statuses, err = suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {

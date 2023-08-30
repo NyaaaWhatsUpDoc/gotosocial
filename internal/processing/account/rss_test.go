@@ -59,7 +59,7 @@ func (suite *GetRSSTestSuite) TestGetAccountRSSZorkNoPosts() {
 	ctx := context.Background()
 
 	// Get all of zork's posts.
-	statuses, err := suite.db.GetAccountStatuses(ctx, suite.testAccounts["local_account_1"].ID, 0, false, false, "", "", false, false)
+	statuses, err := suite.db.GetAccountStatuses(ctx, suite.testAccounts["local_account_1"].ID, nil, false, false, false, false)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}

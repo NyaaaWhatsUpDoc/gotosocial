@@ -363,7 +363,7 @@ func (suite *FromFediAPITestSuite) TestProcessAccountDelete() {
 
 	// no statuses from foss satan should be left in the database
 	if !testrig.WaitFor(func() bool {
-		s, err := suite.db.GetAccountStatuses(ctx, deletedAccount.ID, 0, false, false, "", "", false, false)
+		s, err := suite.db.GetAccountStatuses(ctx, deletedAccount.ID, nil, false, false, false, false)
 		return s == nil && err == db.ErrNoEntries
 	}) {
 		suite.FailNow("timeout waiting for statuses to be deleted")

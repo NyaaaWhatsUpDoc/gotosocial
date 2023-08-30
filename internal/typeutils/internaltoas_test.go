@@ -29,6 +29,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/ap"
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/testrig"
 )
 
@@ -660,10 +661,10 @@ func (suite *InternalToASTestSuite) TestStatusesToASOutboxPage() {
 	ctx := context.Background()
 
 	// get public statuses from testaccount
-	statuses, err := suite.db.GetAccountStatuses(ctx, testAccount.ID, 30, true, true, "", "", false, true)
+	statuses, err := suite.db.GetAccountStatuses(ctx, testAccount.ID, paging.New("", "", "", 30), true, true, false, true)
 	suite.NoError(err)
 
-	page, err := suite.typeconverter.StatusesToASOutboxPage(ctx, testAccount.OutboxURI, "", "", statuses)
+	page, err := suite.typeconverter.StatusesToASOutboxPage(ctx, testAccount.OutboxURI, nil, statuses)
 	suite.NoError(err)
 
 	ser, err := ap.Serialize(page)

@@ -40,8 +40,9 @@ type Processor struct {
 }
 
 // New returns a new status processor.
-func New(state *state.State, federator federation.Federator, tc typeutils.TypeConverter, filter *visibility.Filter, parseMention gtsmodel.ParseMentionFunc) Processor {
+func New(c *common.Processor, state *state.State, federator federation.Federator, tc typeutils.TypeConverter, filter *visibility.Filter, parseMention gtsmodel.ParseMentionFunc) Processor {
 	return Processor{
+		c:            c,
 		state:        state,
 		federator:    federator,
 		tc:           tc,

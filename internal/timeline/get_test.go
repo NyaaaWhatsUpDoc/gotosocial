@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/id"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/timeline"
 )
 
@@ -98,11 +99,9 @@ func (suite *GetTestSuite) emptyAccountStatuses(ctx context.Context, accountID s
 	statuses, err := suite.state.DB.GetAccountStatuses(
 		ctx,
 		accountID,
-		9999,
+		paging.New(id.Lowest, "", id.Highest, 9999),
 		false,
 		false,
-		id.Highest,
-		id.Lowest,
 		false,
 		false,
 	)
@@ -133,10 +132,7 @@ func (suite *GetTestSuite) TestGetNewTimelinePageDown() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -149,10 +145,7 @@ func (suite *GetTestSuite) TestGetNewTimelinePageDown() {
 	statuses, err = suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -176,10 +169,7 @@ func (suite *GetTestSuite) TestGetNewTimelinePageUp() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -192,10 +182,7 @@ func (suite *GetTestSuite) TestGetNewTimelinePageUp() {
 	statuses, err = suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -219,10 +206,7 @@ func (suite *GetTestSuite) TestGetNewTimelineMoreThanPossible() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -246,10 +230,7 @@ func (suite *GetTestSuite) TestGetNewTimelineMoreThanPossiblePageUp() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -275,10 +256,7 @@ func (suite *GetTestSuite) TestGetNewTimelineNoFollowing() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -311,10 +289,7 @@ func (suite *GetTestSuite) TestGetNewTimelineNoFollowingNoStatuses() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -340,10 +315,7 @@ func (suite *GetTestSuite) TestGetNoParams() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -373,10 +345,7 @@ func (suite *GetTestSuite) TestGetMaxID() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -404,10 +373,7 @@ func (suite *GetTestSuite) TestGetSinceID() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -438,10 +404,7 @@ func (suite *GetTestSuite) TestGetSinceIDOneOnly() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -472,10 +435,7 @@ func (suite *GetTestSuite) TestGetMinID() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -506,10 +466,7 @@ func (suite *GetTestSuite) TestGetMinIDOneOnly() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -540,10 +497,7 @@ func (suite *GetTestSuite) TestGetMinIDFromLowestInTestrig() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -574,10 +528,7 @@ func (suite *GetTestSuite) TestGetMinIDFromLowestPossible() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -608,10 +559,7 @@ func (suite *GetTestSuite) TestGetBetweenID() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -640,10 +588,7 @@ func (suite *GetTestSuite) TestGetBetweenIDImpossible() {
 	statuses, err := suite.state.Timelines.Home.GetTimeline(
 		ctx,
 		testAccount.ID,
-		maxID,
-		sinceID,
-		minID,
-		limit,
+		paging.New(minID, sinceID, maxID, limit),
 		local,
 	)
 	if err != nil {
@@ -682,10 +627,7 @@ func (suite *GetTestSuite) TestGetTimelinesAsync() {
 				if _, err := suite.state.Timelines.Home.GetTimeline(
 					ctx,
 					testAccount.ID,
-					maxID,
-					sinceID,
-					minID,
-					limit,
+					paging.New(minID, sinceID, maxID, limit),
 					local,
 				); err != nil {
 					suite.FailNow(err.Error())

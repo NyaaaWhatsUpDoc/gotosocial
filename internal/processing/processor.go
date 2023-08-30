@@ -24,6 +24,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
 	"github.com/superseriousbusiness/gotosocial/internal/processing/account"
 	"github.com/superseriousbusiness/gotosocial/internal/processing/admin"
+	"github.com/superseriousbusiness/gotosocial/internal/processing/common"
 	"github.com/superseriousbusiness/gotosocial/internal/processing/fedi"
 	"github.com/superseriousbusiness/gotosocial/internal/processing/list"
 	"github.com/superseriousbusiness/gotosocial/internal/processing/markers"
@@ -147,7 +148,8 @@ func NewProcessor(
 	//
 	// Start with sub processors that will
 	// be required by the workers processor.
-	accountProcessor := account.New(state, tc, mediaManager, oauthServer, federator, filter, parseMentionFunc)
+	common := common.New(state, tc, federator, filter)
+	accountProcessor := account.New(&common, state, tc, mediaManager, oauthServer, federator, filter, parseMentionFunc)
 	mediaProcessor := media.New(state, tc, mediaManager, federator.TransportController())
 	streamProcessor := stream.New(state, oauthServer)
 
@@ -160,9 +162,9 @@ func NewProcessor(
 	processor.markers = markers.New(state, tc)
 	processor.media = mediaProcessor
 	processor.report = report.New(state, tc)
-	processor.timeline = timeline.New(state, tc, filter)
+	processor.timeline = timeline.New(&common, state, tc, filter)
 	processor.search = search.New(state, federator, tc, filter)
-	processor.status = status.New(state, federator, tc, filter, parseMentionFunc)
+	processor.status = status.New(&common, state, federator, tc, filter, parseMentionFunc)
 	processor.stream = streamProcessor
 	processor.user = user.New(state, emailSender)
 

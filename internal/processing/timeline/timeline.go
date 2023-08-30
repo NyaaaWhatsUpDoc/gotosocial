@@ -33,8 +33,9 @@ type Processor struct {
 	filter *visibility.Filter
 }
 
-func New(state *state.State, tc typeutils.TypeConverter, filter *visibility.Filter) Processor {
+func New(c *common.Processor, state *state.State, tc typeutils.TypeConverter, filter *visibility.Filter) Processor {
 	return Processor{
+		c:      c,
 		state:  state,
 		tc:     tc,
 		filter: filter,

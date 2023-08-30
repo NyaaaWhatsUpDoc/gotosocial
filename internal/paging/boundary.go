@@ -116,12 +116,11 @@ func (b Boundary[T]) Find(in []T) int {
 // Query ...
 func (b Boundary[T]) Query() string {
 	switch {
-	case b.Name == "":
-		panic("nil page boundary name")
 	case zero(b.Value):
 		return ""
+	case b.Name == "":
+		panic("value without boundary name")
+	default:
+		return fmt.Sprintf("%s=%v", b.Name, b.Value)
 	}
-
-	// Return an actual formatted query.
-	return fmt.Sprintf("%s=%v", b.Name, b.Value)
 }
