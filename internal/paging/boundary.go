@@ -28,7 +28,8 @@ func MinID(minID, sinceID string) Boundary[string] {
 			Value: sinceID,
 
 			// with "since_id", return
-			// as descending order items.
+			// as ascending order items,
+			// i.e. newest at lowest idx
 			Order: OrderDescending,
 		}
 	default:
@@ -38,7 +39,8 @@ func MinID(minID, sinceID string) Boundary[string] {
 			Value: minID,
 
 			// with "min_id", return
-			// as ascending order items.
+			// as ascending order items,
+			// i.e. oldest at lowest idx
 			Order: OrderAscending,
 		}
 	}
@@ -72,6 +74,9 @@ func MaxShortcodeDomain(max string) Boundary[string] {
 	return Boundary[string]{
 		Name:  "max_shortcode_domain",
 		Value: max,
+
+		// no order specified
+		Order: 0,
 	}
 }
 
@@ -107,14 +112,12 @@ func (b Boundary[T]) Find(in []T) int {
 // Query ...
 func (b Boundary[T]) Query() string {
 	switch {
-	case !zero(b.Value):
-		return fmt.Sprintf("%s=%v", b.Name, b.Value)
-	default:
+	case b.Name == "":
+		panic("nil page boundary name")
+	case zero(b.Value):
 		return ""
 	}
-}
 
-// Update ...
-func (b *Boundary[T]) Update(value T) {
-	b.Value = value
+	// Return an actual formatted query.
+	return fmt.Sprintf("%s=%v", b.Name, b.Value)
 }

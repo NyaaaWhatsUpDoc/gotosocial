@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"github.com/superseriousbusiness/gotosocial/internal/db"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 type SearchTestSuite struct {
@@ -32,7 +33,7 @@ type SearchTestSuite struct {
 func (suite *SearchTestSuite) TestSearchAccountsTurtleAny() {
 	testAccount := suite.testAccounts["local_account_1"]
 
-	accounts, err := suite.db.SearchForAccounts(context.Background(), testAccount.ID, "turtle", "", "", 10, false, 0)
+	accounts, err := suite.db.SearchForAccounts(context.Background(), testAccount.ID, "turtle", paging.New("", "", "", 10), false, 0)
 	suite.NoError(err)
 	suite.Len(accounts, 1)
 }
@@ -40,7 +41,7 @@ func (suite *SearchTestSuite) TestSearchAccountsTurtleAny() {
 func (suite *SearchTestSuite) TestSearchAccountsTurtleFollowing() {
 	testAccount := suite.testAccounts["local_account_1"]
 
-	accounts, err := suite.db.SearchForAccounts(context.Background(), testAccount.ID, "turtle", "", "", 10, true, 0)
+	accounts, err := suite.db.SearchForAccounts(context.Background(), testAccount.ID, "turtle", paging.New("", "", "", 10), true, 0)
 	suite.NoError(err)
 	suite.Len(accounts, 1)
 }
@@ -48,7 +49,7 @@ func (suite *SearchTestSuite) TestSearchAccountsTurtleFollowing() {
 func (suite *SearchTestSuite) TestSearchAccountsPostFollowing() {
 	testAccount := suite.testAccounts["local_account_1"]
 
-	accounts, err := suite.db.SearchForAccounts(context.Background(), testAccount.ID, "post", "", "", 10, true, 0)
+	accounts, err := suite.db.SearchForAccounts(context.Background(), testAccount.ID, "post", paging.New("", "", "", 10), true, 0)
 	suite.NoError(err)
 	suite.Len(accounts, 1)
 }
@@ -56,7 +57,7 @@ func (suite *SearchTestSuite) TestSearchAccountsPostFollowing() {
 func (suite *SearchTestSuite) TestSearchAccountsPostAny() {
 	testAccount := suite.testAccounts["local_account_1"]
 
-	accounts, err := suite.db.SearchForAccounts(context.Background(), testAccount.ID, "post", "", "", 10, false, 0)
+	accounts, err := suite.db.SearchForAccounts(context.Background(), testAccount.ID, "post", paging.New("", "", "", 10), false, 0)
 	suite.NoError(err, db.ErrNoEntries)
 	suite.Empty(accounts)
 }
@@ -64,7 +65,7 @@ func (suite *SearchTestSuite) TestSearchAccountsPostAny() {
 func (suite *SearchTestSuite) TestSearchAccountsFossAny() {
 	testAccount := suite.testAccounts["local_account_1"]
 
-	accounts, err := suite.db.SearchForAccounts(context.Background(), testAccount.ID, "foss", "", "", 10, false, 0)
+	accounts, err := suite.db.SearchForAccounts(context.Background(), testAccount.ID, "foss", paging.New("", "", "", 10), false, 0)
 	suite.NoError(err)
 	suite.Len(accounts, 1)
 }
@@ -72,24 +73,24 @@ func (suite *SearchTestSuite) TestSearchAccountsFossAny() {
 func (suite *SearchTestSuite) TestSearchStatuses() {
 	testAccount := suite.testAccounts["local_account_1"]
 
-	statuses, err := suite.db.SearchForStatuses(context.Background(), testAccount.ID, "hello", "", "", 10, 0)
+	statuses, err := suite.db.SearchForStatuses(context.Background(), testAccount.ID, "hello", paging.New("", "", "", 10), 0)
 	suite.NoError(err)
 	suite.Len(statuses, 1)
 }
 
 func (suite *SearchTestSuite) TestSearchTags() {
 	// Search with full tag string.
-	tags, err := suite.db.SearchForTags(context.Background(), "welcome", "", "", 10, 0)
+	tags, err := suite.db.SearchForTags(context.Background(), "welcome", paging.New("", "", "", 10), 0)
 	suite.NoError(err)
 	suite.Len(tags, 1)
 
 	// Search with partial tag string.
-	tags, err = suite.db.SearchForTags(context.Background(), "wel", "", "", 10, 0)
+	tags, err = suite.db.SearchForTags(context.Background(), "wel", paging.New("", "", "", 10), 0)
 	suite.NoError(err)
 	suite.Len(tags, 1)
 
 	// Search with end of tag string.
-	tags, err = suite.db.SearchForTags(context.Background(), "come", "", "", 10, 0)
+	tags, err = suite.db.SearchForTags(context.Background(), "come", paging.New("", "", "", 10), 0)
 	suite.NoError(err)
 	suite.Len(tags, 0)
 }

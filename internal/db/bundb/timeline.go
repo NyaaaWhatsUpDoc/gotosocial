@@ -38,54 +38,6 @@ type timelineDB struct {
 }
 
 func (t *timelineDB) GetHomeTimeline(ctx context.Context, accountID string, page *paging.Page[string], local bool) ([]*gtsmodel.Status, error) {
-	var (
-		// Get paging parameters.
-		minID, _ = page.GetMin()
-		maxID, _ = page.GetMax()
-		limit, _ = page.GetLimit()
-		order, _ = page.GetOrder()
-
-		// Make educated guess for slice size
-		statusIDs = make([]string, 0, limit)
-
-		// check requested return order based on paging
-		frontToBack = (order == paging.OrderAscending)
-	)
-
-	q := t.db.
-		NewSelect().
-		TableExpr("? AS ?", bun.Ident("statuses"), bun.Ident("status")).
-		// Select only IDs from table
-		Column("status.id")
-
-	if maxID != "" {
-		// return only statuses LOWER (ie., older) than maxID
-		q = q.Where("? < ?", bun.Ident("status.id"), maxID)
-	}
-
-	if minID != "" {
-		// return only statuses HIGHER (ie., newer) than minID
-		q = q.Where("? > ?", bun.Ident("status.id"), minID)
-	}
-
-	if local {
-		// return only statuses posted by local account havers
-		q = q.Where("? = ?", bun.Ident("status.local"), local)
-	}
-
-	if limit > 0 {
-		// limit amount of statuses returned
-		q = q.Limit(limit)
-	}
-
-	if frontToBack {
-		// Page down.
-		q = q.Order("status.id DESC")
-	} else {
-		// Page up.
-		q = q.Order("status.id ASC")
-	}
-
 	// As this is the home timeline, it should be
 	// populated by statuses from accounts followed
 	// by accountID, and posts from accountID itself.
@@ -100,6 +52,17 @@ func (t *timelineDB) GetHomeTimeline(ctx context.Context, accountID string, page
 	)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
 		return nil, gtserror.Newf("db error getting follows for account %s: %w", accountID, err)
+	}
+
+	q := t.db.
+		NewSelect().
+		TableExpr("? AS ?", bun.Ident("statuses"), bun.Ident("status")).
+		// Select only IDs from table
+		Column("status.id")
+
+	if local {
+		// return only statuses posted by local account havers
+		q = q.Where("? = ?", bun.Ident("status.local"), local)
 	}
 
 	// Extract just the accountID from each follow.
@@ -120,7 +83,14 @@ func (t *timelineDB) GetHomeTimeline(ctx context.Context, accountID string, page
 		bun.In(targetAccountIDs),
 	)
 
-	if err := q.Scan(ctx, &statusIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	statusIDs, err := scanQueryPage(ctx, q, page, "status.id")
+	if err != nil {
 		return nil, err
 	}
 
@@ -128,34 +98,11 @@ func (t *timelineDB) GetHomeTimeline(ctx context.Context, accountID string, page
 		return nil, nil
 	}
 
-	// If we're paging up, we still want statuses
-	// to be sorted by ID desc, so reverse ids slice.
-	// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
-	if !frontToBack {
-		for l, r := 0, len(statusIDs)-1; l < r; l, r = l+1, r-1 {
-			statusIDs[l], statusIDs[r] = statusIDs[r], statusIDs[l]
-		}
-	}
-
 	// Fetch statuses for the fetched (+ sorted) IDs.
 	return t.state.DB.GetStatusesByIDs(ctx, statusIDs)
 }
 
 func (t *timelineDB) GetPublicTimeline(ctx context.Context, page *paging.Page[string], local bool) ([]*gtsmodel.Status, error) {
-	var (
-		// Get paging parameters.
-		minID, _ = page.GetMin()
-		maxID, _ = page.GetMax()
-		limit, _ = page.GetLimit()
-		order, _ = page.GetOrder()
-
-		// Make educated guess for slice size
-		statusIDs = make([]string, 0, limit)
-
-		// check requested return order based on paging
-		frontToBack = (order == paging.OrderAscending)
-	)
-
 	q := t.db.
 		NewSelect().
 		TableExpr("? AS ?", bun.Ident("statuses"), bun.Ident("status")).
@@ -165,49 +112,24 @@ func (t *timelineDB) GetPublicTimeline(ctx context.Context, page *paging.Page[st
 		// Ignore boosts.
 		Where("? IS NULL", bun.Ident("status.boost_of_id"))
 
-	if maxID != "" {
-		// return only statuses LOWER (ie., older) than maxID
-		q = q.Where("? < ?", bun.Ident("status.id"), maxID)
-	}
-
-	if minID != "" {
-		// return only statuses HIGHER (ie., newer) than minID
-		q = q.Where("? > ?", bun.Ident("status.id"), minID)
-	}
-
 	if local {
 		// return only statuses posted by local account havers
 		q = q.Where("? = ?", bun.Ident("status.local"), local)
 	}
 
-	if limit > 0 {
-		// limit amount of statuses returned
-		q = q.Limit(limit)
-	}
-
-	if frontToBack {
-		// Page down.
-		q = q.Order("status.id DESC")
-	} else {
-		// Page up.
-		q = q.Order("status.id ASC")
-	}
-
-	if err := q.Scan(ctx, &statusIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	statusIDs, err := scanQueryPage(ctx, q, page, "status.id")
+	if err != nil {
 		return nil, err
 	}
 
 	if len(statusIDs) == 0 {
 		return nil, nil
-	}
-
-	// If we're paging up, we still want statuses
-	// to be sorted by ID desc, so reverse ids slice.
-	// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
-	if !frontToBack {
-		for l, r := 0, len(statusIDs)-1; l < r; l, r = l+1, r-1 {
-			statusIDs[l], statusIDs[r] = statusIDs[r], statusIDs[l]
-		}
 	}
 
 	// Fetch statuses for the fetched (+ sorted) IDs.
@@ -217,67 +139,25 @@ func (t *timelineDB) GetPublicTimeline(ctx context.Context, page *paging.Page[st
 // TODO optimize this query and the logic here, because it's slow as balls -- it takes like a literal second to return with a limit of 20!
 // It might be worth serving it through a timeline instead of raw DB queries, like we do for Home feeds.
 func (t *timelineDB) GetFavedTimeline(ctx context.Context, accountID string, page *paging.Page[string]) ([]*gtsmodel.StatusFave, error) {
-	var (
-		// Get paging parameters.
-		minID, _ = page.GetMin()
-		maxID, _ = page.GetMax()
-		limit, _ = page.GetLimit()
-		order, _ = page.GetOrder()
-
-		// Make educated guess for slice size
-		faveIDs = make([]string, 0, limit)
-
-		// check requested return order based on paging
-		frontToBack = (order == paging.OrderAscending)
-	)
-
-	fq := t.db.
+	q := t.db.
 		NewSelect().
-		Model(&faveIDs).
 		Table("status_faves").
 		Column("id").
-		Where("? = ?", bun.Ident("account_id"), accountID).
-		Order("id DESC")
+		Where("? = ?", bun.Ident("account_id"), accountID)
 
-	if maxID != "" {
-		// return only status faves LOWER (ie., older) than maxID
-		fq = fq.Where("? < ?", bun.Ident("status_fave.id"), maxID)
-	}
-
-	if minID != "" {
-		// return only status faves HIGHER (ie., newer) than minID
-		fq = fq.Where("? > ?", bun.Ident("status_fave.id"), minID)
-	}
-
-	if limit > 0 {
-		// limit amount of faves returned
-		fq = fq.Limit(limit)
-	}
-
-	if frontToBack {
-		// Page down.
-		fq = fq.Order("status.id DESC")
-	} else {
-		// Page up.
-		fq = fq.Order("status.id ASC")
-	}
-
-	err := fq.Scan(ctx, &faveIDs)
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	faveIDs, err := scanQueryPage(ctx, q, page, "status_faves.status_id")
 	if err != nil {
 		return nil, err
 	}
 
 	if len(faveIDs) == 0 {
-		return nil, db.ErrNoEntries
-	}
-
-	// If we're paging up, we still want faves
-	// to be sorted by ID desc, so reverse ids slice.
-	// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
-	if !frontToBack {
-		for l, r := 0, len(faveIDs)-1; l < r; l, r = l+1, r-1 {
-			faveIDs[l], faveIDs[r] = faveIDs[r], faveIDs[l]
-		}
+		return nil, nil
 	}
 
 	// Fetch favourite models for all of the IDs.
@@ -303,20 +183,6 @@ func (t *timelineDB) GetListTimeline(
 	listID string,
 	page *paging.Page[string],
 ) ([]*gtsmodel.Status, error) {
-	var (
-		// Get paging parameters.
-		minID, _ = page.GetMin()
-		maxID, _ = page.GetMax()
-		limit, _ = page.GetLimit()
-		order, _ = page.GetOrder()
-
-		// Make educated guess for slice size
-		statusIDs = make([]string, 0, limit)
-
-		// check requested return order based on paging
-		frontToBack = (order == paging.OrderAscending)
-	)
-
 	// Fetch all listEntries entries from the database.
 	listEntries, err := t.state.DB.GetListEntries(
 		// Don't need actual follows
@@ -351,44 +217,19 @@ func (t *timelineDB) GetListTimeline(
 		Column("status.id").
 		Where("? IN (?)", bun.Ident("status.account_id"), subQ)
 
-	if maxID != "" {
-		// return only statuses LOWER (ie., older) than maxID
-		q = q.Where("? < ?", bun.Ident("status.id"), maxID)
-	}
-
-	if minID != "" {
-		// return only statuses HIGHER (ie., newer) than minID
-		q = q.Where("? > ?", bun.Ident("status.id"), minID)
-	}
-
-	if limit > 0 {
-		// limit amount of statuses returned
-		q = q.Limit(limit)
-	}
-
-	if frontToBack {
-		// Page down.
-		q = q.Order("status.id DESC")
-	} else {
-		// Page up.
-		q = q.Order("status.id ASC")
-	}
-
-	if err := q.Scan(ctx, &statusIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	statusIDs, err := scanQueryPage(ctx, q, page, "status.id")
+	if err != nil {
 		return nil, err
 	}
 
 	if len(statusIDs) == 0 {
 		return nil, nil
-	}
-
-	// If we're paging up, we still want statuses
-	// to be sorted by ID desc, so reverse ids slice.
-	// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
-	if !frontToBack {
-		for l, r := 0, len(statusIDs)-1; l < r; l, r = l+1, r-1 {
-			statusIDs[l], statusIDs[r] = statusIDs[r], statusIDs[l]
-		}
 	}
 
 	// Fetch statuses for the fetched (+ sorted) IDs.
@@ -400,20 +241,6 @@ func (t *timelineDB) GetTagTimeline(
 	tagID string,
 	page *paging.Page[string],
 ) ([]*gtsmodel.Status, error) {
-	var (
-		// Get paging parameters.
-		minID, _ = page.GetMin()
-		maxID, _ = page.GetMax()
-		limit, _ = page.GetLimit()
-		order, _ = page.GetOrder()
-
-		// Make educated guess for slice size
-		statusIDs = make([]string, 0, limit)
-
-		// check requested return order based on paging
-		frontToBack = (order == paging.OrderAscending)
-	)
-
 	q := t.db.
 		NewSelect().
 		TableExpr("? AS ?", bun.Ident("status_to_tags"), bun.Ident("status_to_tag")).
@@ -429,44 +256,19 @@ func (t *timelineDB) GetTagTimeline(
 		// This tag only.
 		Where("? = ?", bun.Ident("status_to_tag.tag_id"), tagID)
 
-	if maxID != "" {
-		// return only statuses LOWER (ie., older) than maxID
-		q = q.Where("? < ?", bun.Ident("status_to_tag.status_id"), maxID)
-	}
-
-	if minID != "" {
-		// return only statuses HIGHER (ie., newer) than minID
-		q = q.Where("? > ?", bun.Ident("status_to_tag.status_id"), minID)
-	}
-
-	if limit > 0 {
-		// limit amount of statuses returned
-		q = q.Limit(limit)
-	}
-
-	if frontToBack {
-		// Page down.
-		q = q.Order("status_to_tag.status_id DESC")
-	} else {
-		// Page up.
-		q = q.Order("status_to_tag.status_id ASC")
-	}
-
-	if err := q.Scan(ctx, &statusIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	statusIDs, err := scanQueryPage(ctx, q, page, "status.id")
+	if err != nil {
 		return nil, err
 	}
 
 	if len(statusIDs) == 0 {
 		return nil, nil
-	}
-
-	// If we're paging up, we still want statuses
-	// to be sorted by ID desc, so reverse ids slice.
-	// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
-	if !frontToBack {
-		for l, r := 0, len(statusIDs)-1; l < r; l, r = l+1, r-1 {
-			statusIDs[l], statusIDs[r] = statusIDs[r], statusIDs[l]
-		}
 	}
 
 	// Fetch statuses for the fetched (+ sorted) IDs.

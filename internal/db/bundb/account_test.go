@@ -32,6 +32,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/db/bundb"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/uptrace/bun"
 )
 
@@ -40,53 +41,58 @@ type AccountTestSuite struct {
 }
 
 func (suite *AccountTestSuite) TestGetAccountStatuses() {
-	statuses, err := suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, 20, false, false, "", "", false, false)
+	statuses, err := suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New("", "", "", 20), false, false, false, false)
 	suite.NoError(err)
 	suite.Len(statuses, 5)
 }
 
 func (suite *AccountTestSuite) TestGetAccountStatusesPageDown() {
+	var minID string
+
 	// get the first page
-	statuses, err := suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, 2, false, false, "", "", false, false)
+	statuses, err := suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New("", "", "", 2), false, false, false, false)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
 	suite.Len(statuses, 2)
+	minID = statuses[len(statuses)-1].ID
 
 	// get the second page
-	statuses, err = suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, 2, false, false, statuses[len(statuses)-1].ID, "", false, false)
+	statuses, err = suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New(minID, "", "", 2), false, false, false, false)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
 	suite.Len(statuses, 2)
+	minID = statuses[len(statuses)-1].ID
 
 	// get the third page
-	statuses, err = suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, 2, false, false, statuses[len(statuses)-1].ID, "", false, false)
+	statuses, err = suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New(minID, "", "", 2), false, false, false, false)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
 	suite.Len(statuses, 1)
+	minID = statuses[len(statuses)-1].ID
 
 	// try to get the last page (should be empty)
-	statuses, err = suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, 2, false, false, statuses[len(statuses)-1].ID, "", false, false)
+	statuses, err = suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New(minID, "", "", 2), false, false, false, false)
 	suite.ErrorIs(err, db.ErrNoEntries)
 	suite.Empty(statuses)
 }
 
 func (suite *AccountTestSuite) TestGetAccountStatusesExcludeRepliesAndReblogs() {
-	statuses, err := suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, 20, true, true, "", "", false, false)
+	statuses, err := suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New("", "", "", 20), true, true, false, false)
 	suite.NoError(err)
 	suite.Len(statuses, 5)
 }
 
 func (suite *AccountTestSuite) TestGetAccountStatusesExcludeRepliesAndReblogsPublicOnly() {
-	statuses, err := suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, 20, true, true, "", "", false, true)
+	statuses, err := suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New("", "", "", 20), true, true, false, true)
 	suite.NoError(err)
 	suite.Len(statuses, 1)
 }
 
 func (suite *AccountTestSuite) TestGetAccountStatusesMediaOnly() {
-	statuses, err := suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, 20, false, false, "", "", true, false)
+	statuses, err := suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New("", "", "", 20), false, false, true, false)
 	suite.NoError(err)
 	suite.Len(statuses, 1)
 }

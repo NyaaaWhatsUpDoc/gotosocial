@@ -202,56 +202,50 @@ func (m *mediaDB) DeleteAttachment(ctx context.Context, id string) error {
 }
 
 func (m *mediaDB) GetAttachments(ctx context.Context, page *paging.Page[string]) ([]*gtsmodel.MediaAttachment, error) {
-	// Get limit (always >= 0).
-	limit, _ := page.GetLimit()
-
-	attachmentIDs := make([]string, 0, limit)
-
 	q := m.db.NewSelect().
 		Table("media_attachments").
-		Column("id").
-		Order("id DESC")
+		Column("id")
 
-	if maxID, ok := page.GetMax(); ok {
-		q = q.Where("id < ?", maxID)
-	}
-
-	if limit > 0 {
-		q = q.Limit(limit)
-	}
-
-	if err := q.Scan(ctx, &attachmentIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	mediaIDs, err := scanQueryPage(ctx, q, page, "media_attachments.id")
+	if err != nil {
 		return nil, err
 	}
 
-	return m.GetAttachmentsByIDs(ctx, attachmentIDs)
+	if len(mediaIDs) == 0 {
+		return nil, nil
+	}
+
+	return m.GetAttachmentsByIDs(ctx, mediaIDs)
 }
 
 func (m *mediaDB) GetRemoteAttachments(ctx context.Context, page *paging.Page[string]) ([]*gtsmodel.MediaAttachment, error) {
-	// Get limit (always >= 0).
-	limit, _ := page.GetLimit()
-
-	attachmentIDs := make([]string, 0, limit)
-
 	q := m.db.NewSelect().
 		Table("media_attachments").
 		Column("id").
-		Where("remote_url IS NOT NULL").
-		Order("id DESC")
+		Where("remote_url IS NOT NULL")
 
-	if maxID, ok := page.GetMax(); ok {
-		q = q.Where("id < ?", maxID)
-	}
-
-	if limit > 0 {
-		q = q.Limit(limit)
-	}
-
-	if err := q.Scan(ctx, &attachmentIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	mediaIDs, err := scanQueryPage(ctx, q, page, "media_attachments.id")
+	if err != nil {
 		return nil, err
 	}
 
-	return m.GetAttachmentsByIDs(ctx, attachmentIDs)
+	if len(mediaIDs) == 0 {
+		return nil, nil
+	}
+
+	return m.GetAttachmentsByIDs(ctx, mediaIDs)
 }
 
 func (m *mediaDB) GetCachedAttachmentsOlderThan(ctx context.Context, olderThan time.Time, limit int) ([]*gtsmodel.MediaAttachment, error) {
@@ -263,8 +257,7 @@ func (m *mediaDB) GetCachedAttachmentsOlderThan(ctx context.Context, olderThan t
 		Column("id").
 		Where("cached = true").
 		Where("remote_url IS NOT NULL").
-		Where("created_at < ?", olderThan).
-		Order("created_at DESC")
+		Where("created_at < ?", olderThan)
 
 	if limit != 0 {
 		q = q.Limit(limit)

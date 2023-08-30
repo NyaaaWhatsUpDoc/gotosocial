@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/suite"
 	"github.com/superseriousbusiness/gotosocial/internal/db"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/testrig"
 )
 
@@ -59,7 +60,7 @@ func (suite *EmojiTestSuite) TestGetEmojiByStaticURL() {
 }
 
 func (suite *EmojiTestSuite) TestGetAllEmojis() {
-	emojis, err := suite.db.GetEmojisBy(context.Background(), db.EmojiAllDomains, true, true, "", "", "", 0)
+	emojis, err := suite.db.GetEmojisBy(context.Background(), db.EmojiAllDomains, true, true, "", nil)
 
 	suite.NoError(err)
 	suite.Equal(2, len(emojis))
@@ -68,7 +69,7 @@ func (suite *EmojiTestSuite) TestGetAllEmojis() {
 }
 
 func (suite *EmojiTestSuite) TestGetAllEmojisLimit1() {
-	emojis, err := suite.db.GetEmojisBy(context.Background(), db.EmojiAllDomains, true, true, "", "", "", 1)
+	emojis, err := suite.db.GetEmojisBy(context.Background(), db.EmojiAllDomains, true, true, "", paging.New("", "", "", 1))
 
 	suite.NoError(err)
 	suite.Equal(1, len(emojis))
@@ -76,7 +77,11 @@ func (suite *EmojiTestSuite) TestGetAllEmojisLimit1() {
 }
 
 func (suite *EmojiTestSuite) TestGetAllEmojisMaxID() {
-	emojis, err := suite.db.GetEmojisBy(context.Background(), db.EmojiAllDomains, true, true, "", "rainbow@", "", 0)
+	pg := &paging.Page[string]{
+		Max: paging.MaxShortcodeDomain("rainbow@"),
+	}
+
+	emojis, err := suite.db.GetEmojisBy(context.Background(), db.EmojiAllDomains, true, true, "", pg)
 
 	suite.NoError(err)
 	suite.Equal(1, len(emojis))
@@ -84,7 +89,11 @@ func (suite *EmojiTestSuite) TestGetAllEmojisMaxID() {
 }
 
 func (suite *EmojiTestSuite) TestGetAllEmojisMinID() {
-	emojis, err := suite.db.GetEmojisBy(context.Background(), db.EmojiAllDomains, true, true, "", "", "yell@fossbros-anonymous.io", 0)
+	pg := &paging.Page[string]{
+		Min: paging.MinShortcodeDomain("yell@fossbros-anonymous.io"),
+	}
+
+	emojis, err := suite.db.GetEmojisBy(context.Background(), db.EmojiAllDomains, true, true, "", pg)
 
 	suite.NoError(err)
 	suite.Equal(1, len(emojis))
@@ -92,14 +101,14 @@ func (suite *EmojiTestSuite) TestGetAllEmojisMinID() {
 }
 
 func (suite *EmojiTestSuite) TestGetAllDisabledEmojis() {
-	emojis, err := suite.db.GetEmojisBy(context.Background(), db.EmojiAllDomains, true, false, "", "", "", 0)
+	emojis, err := suite.db.GetEmojisBy(context.Background(), db.EmojiAllDomains, true, false, "", nil)
 
 	suite.ErrorIs(err, db.ErrNoEntries)
 	suite.Equal(0, len(emojis))
 }
 
 func (suite *EmojiTestSuite) TestGetAllEnabledEmojis() {
-	emojis, err := suite.db.GetEmojisBy(context.Background(), db.EmojiAllDomains, false, true, "", "", "", 0)
+	emojis, err := suite.db.GetEmojisBy(context.Background(), db.EmojiAllDomains, false, true, "", nil)
 
 	suite.NoError(err)
 	suite.Equal(2, len(emojis))
@@ -108,7 +117,7 @@ func (suite *EmojiTestSuite) TestGetAllEnabledEmojis() {
 }
 
 func (suite *EmojiTestSuite) TestGetLocalEnabledEmojis() {
-	emojis, err := suite.db.GetEmojisBy(context.Background(), "", false, true, "", "", "", 0)
+	emojis, err := suite.db.GetEmojisBy(context.Background(), "", false, true, "", nil)
 
 	suite.NoError(err)
 	suite.Equal(1, len(emojis))
@@ -116,21 +125,21 @@ func (suite *EmojiTestSuite) TestGetLocalEnabledEmojis() {
 }
 
 func (suite *EmojiTestSuite) TestGetLocalDisabledEmojis() {
-	emojis, err := suite.db.GetEmojisBy(context.Background(), "", true, false, "", "", "", 0)
+	emojis, err := suite.db.GetEmojisBy(context.Background(), "", true, false, "", nil)
 
 	suite.ErrorIs(err, db.ErrNoEntries)
 	suite.Equal(0, len(emojis))
 }
 
 func (suite *EmojiTestSuite) TestGetAllEmojisFromDomain() {
-	emojis, err := suite.db.GetEmojisBy(context.Background(), "peepee.poopoo", true, true, "", "", "", 0)
+	emojis, err := suite.db.GetEmojisBy(context.Background(), "peepee.poopoo", true, true, "", nil)
 
 	suite.ErrorIs(err, db.ErrNoEntries)
 	suite.Equal(0, len(emojis))
 }
 
 func (suite *EmojiTestSuite) TestGetAllEmojisFromDomain2() {
-	emojis, err := suite.db.GetEmojisBy(context.Background(), "fossbros-anonymous.io", true, true, "", "", "", 0)
+	emojis, err := suite.db.GetEmojisBy(context.Background(), "fossbros-anonymous.io", true, true, "", nil)
 
 	suite.NoError(err)
 	suite.Equal(1, len(emojis))
@@ -138,7 +147,7 @@ func (suite *EmojiTestSuite) TestGetAllEmojisFromDomain2() {
 }
 
 func (suite *EmojiTestSuite) TestGetSpecificEmojisFromDomain2() {
-	emojis, err := suite.db.GetEmojisBy(context.Background(), "fossbros-anonymous.io", true, true, "yell", "", "", 0)
+	emojis, err := suite.db.GetEmojisBy(context.Background(), "fossbros-anonymous.io", true, true, "yell", nil)
 
 	suite.NoError(err)
 	suite.Equal(1, len(emojis))

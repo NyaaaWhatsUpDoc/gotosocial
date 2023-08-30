@@ -27,6 +27,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/id"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/util"
 )
 
@@ -86,7 +87,7 @@ func (suite *TimelineTestSuite) publicCount() int {
 
 func (suite *TimelineTestSuite) checkStatuses(statuses []*gtsmodel.Status, maxID string, minID string, expectedLength int) {
 	if l := len(statuses); l != expectedLength {
-		suite.FailNow("", "expected %d statuses in slice, got %d", expectedLength, l)
+		suite.Fail("", "expected %d statuses in slice, got %d", expectedLength, l)
 	} else if l == 0 {
 		// Can't test empty slice.
 		return
@@ -98,15 +99,18 @@ func (suite *TimelineTestSuite) checkStatuses(statuses []*gtsmodel.Status, maxID
 		id := status.ID
 
 		if id >= maxID {
-			suite.FailNow("", "%s greater than maxID %s", id, maxID)
+			suite.Fail("", "%s greater than maxID %s", id, maxID)
+			return
 		}
 
 		if id <= minID {
-			suite.FailNow("", "%s smaller than minID %s", id, minID)
+			suite.Fail("", "%s smaller than minID %s", id, minID)
+			return
 		}
 
 		if id > highest {
-			suite.FailNow("", "statuses in slice were not ordered highest -> lowest ID")
+			suite.Fail("", "statuses in slice were not ordered highest -> lowest ID")
+			return
 		}
 
 		highest = id
@@ -116,7 +120,7 @@ func (suite *TimelineTestSuite) checkStatuses(statuses []*gtsmodel.Status, maxID
 func (suite *TimelineTestSuite) TestGetPublicTimeline() {
 	ctx := context.Background()
 
-	s, err := suite.db.GetPublicTimeline(ctx, "", "", "", 20, false)
+	s, err := suite.db.GetPublicTimeline(ctx, paging.New("", "", "", 20), false)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -134,7 +138,7 @@ func (suite *TimelineTestSuite) TestGetPublicTimelineWithFutureStatus() {
 		suite.FailNow(err.Error())
 	}
 
-	s, err := suite.db.GetPublicTimeline(ctx, "", "", "", 20, false)
+	s, err := suite.db.GetPublicTimeline(ctx, paging.New("", "", "", 20), false)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -149,7 +153,7 @@ func (suite *TimelineTestSuite) TestGetHomeTimeline() {
 		viewingAccount = suite.testAccounts["local_account_1"]
 	)
 
-	s, err := suite.db.GetHomeTimeline(ctx, viewingAccount.ID, "", "", "", 20, false)
+	s, err := suite.db.GetHomeTimeline(ctx, viewingAccount.ID, paging.New("", "", "", 20), false)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -202,7 +206,7 @@ func (suite *TimelineTestSuite) TestGetHomeTimelineWithFutureStatus() {
 		suite.FailNow(err.Error())
 	}
 
-	s, err := suite.db.GetHomeTimeline(ctx, viewingAccount.ID, "", "", "", 20, false)
+	s, err := suite.db.GetHomeTimeline(ctx, viewingAccount.ID, paging.New("", "", "", 20), false)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -217,7 +221,7 @@ func (suite *TimelineTestSuite) TestGetHomeTimelineBackToFront() {
 		viewingAccount = suite.testAccounts["local_account_1"]
 	)
 
-	s, err := suite.db.GetHomeTimeline(ctx, viewingAccount.ID, "", "", id.Lowest, 5, false)
+	s, err := suite.db.GetHomeTimeline(ctx, viewingAccount.ID, paging.New(id.Lowest, "", "", 5), false)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -233,7 +237,7 @@ func (suite *TimelineTestSuite) TestGetHomeTimelineFromHighest() {
 		viewingAccount = suite.testAccounts["local_account_1"]
 	)
 
-	s, err := suite.db.GetHomeTimeline(ctx, viewingAccount.ID, id.Highest, "", "", 5, false)
+	s, err := suite.db.GetHomeTimeline(ctx, viewingAccount.ID, paging.New("", "", id.Highest, 5), false)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -249,7 +253,7 @@ func (suite *TimelineTestSuite) TestGetListTimelineNoParams() {
 		list = suite.testLists["local_account_1_list_1"]
 	)
 
-	s, err := suite.db.GetListTimeline(ctx, list.ID, "", "", "", 20)
+	s, err := suite.db.GetListTimeline(ctx, list.ID, paging.New("", "", "", 20))
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -263,7 +267,7 @@ func (suite *TimelineTestSuite) TestGetListTimelineMaxID() {
 		list = suite.testLists["local_account_1_list_1"]
 	)
 
-	s, err := suite.db.GetListTimeline(ctx, list.ID, id.Highest, "", "", 5)
+	s, err := suite.db.GetListTimeline(ctx, list.ID, paging.New("", "", id.Highest, 5))
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -279,7 +283,7 @@ func (suite *TimelineTestSuite) TestGetListTimelineMinID() {
 		list = suite.testLists["local_account_1_list_1"]
 	)
 
-	s, err := suite.db.GetListTimeline(ctx, list.ID, "", "", id.Lowest, 5)
+	s, err := suite.db.GetListTimeline(ctx, list.ID, paging.New(id.Lowest, "", "", 5))
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -295,7 +299,7 @@ func (suite *TimelineTestSuite) TestGetListTimelineMinIDPagingUp() {
 		list = suite.testLists["local_account_1_list_1"]
 	)
 
-	s, err := suite.db.GetListTimeline(ctx, list.ID, "", "", "01F8MHC8VWDRBQR0N1BATDDEM5", 5)
+	s, err := suite.db.GetListTimeline(ctx, list.ID, paging.New("", "01F8MHC8VWDRBQR0N1BATDDEM5", "", 5))
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -311,7 +315,7 @@ func (suite *TimelineTestSuite) TestGetTagTimelineNoParams() {
 		tag = suite.testTags["welcome"]
 	)
 
-	s, err := suite.db.GetTagTimeline(ctx, tag.ID, "", "", "", 1)
+	s, err := suite.db.GetTagTimeline(ctx, tag.ID, paging.New("", "", id.Highest, 1))
 	if err != nil {
 		suite.FailNow(err.Error())
 	}

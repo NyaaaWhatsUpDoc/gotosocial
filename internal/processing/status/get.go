@@ -64,6 +64,11 @@ func (p *Processor) ContextGet(ctx context.Context, requestingAccount *gtsmodel.
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
+	// Ensure the status children sorted by ID.
+	sort.Slice(children, func(i int, j int) bool {
+		return children[i].ID < children[j].ID
+	})
+
 	// Convert child statuses to frontend API models and filter for visibility to requester.
 	descendents := p.c.GetVisibleAPIStatuses(ctx, requestingAccount, func(i int) *gtsmodel.Status {
 		return children[i]

@@ -291,7 +291,7 @@ func newSelectFollowRequests(db *DB, accountID string) *bun.SelectQuery {
 		TableExpr("?", bun.Ident("follow_requests")).
 		ColumnExpr("?", bun.Ident("id")).
 		Where("? = ?", bun.Ident("target_account_id"), accountID).
-		OrderExpr("? DESC", bun.Ident("updated_at"))
+		OrderExpr("? DESC", bun.Ident("id"))
 }
 
 // newSelectFollowRequesting returns a new select query for all rows in the follow_requests table with account_id = accountID.
@@ -300,7 +300,7 @@ func newSelectFollowRequesting(db *DB, accountID string) *bun.SelectQuery {
 		TableExpr("?", bun.Ident("follow_requests")).
 		ColumnExpr("?", bun.Ident("id")).
 		Where("? = ?", bun.Ident("target_account_id"), accountID).
-		OrderExpr("? DESC", bun.Ident("updated_at"))
+		OrderExpr("? DESC", bun.Ident("id"))
 }
 
 // newSelectFollows returns a new select query for all rows in the follows table with account_id = accountID.
@@ -309,7 +309,7 @@ func newSelectFollows(db *DB, accountID string) *bun.SelectQuery {
 		Table("follows").
 		Column("id").
 		Where("? = ?", bun.Ident("account_id"), accountID).
-		OrderExpr("? DESC", bun.Ident("updated_at"))
+		OrderExpr("? DESC", bun.Ident("id"))
 }
 
 // newSelectLocalFollows returns a new select query for all rows in the follows table with
@@ -327,7 +327,7 @@ func newSelectLocalFollows(db *DB, accountID string) *bun.SelectQuery {
 				Column("id").
 				Where("? IS NULL", bun.Ident("domain")),
 		).
-		OrderExpr("? DESC", bun.Ident("updated_at"))
+		OrderExpr("? DESC", bun.Ident("id"))
 }
 
 // newSelectFollowers returns a new select query for all rows in the follows table with target_account_id = accountID.
@@ -336,7 +336,7 @@ func newSelectFollowers(db *DB, accountID string) *bun.SelectQuery {
 		Table("follows").
 		Column("id").
 		Where("? = ?", bun.Ident("target_account_id"), accountID).
-		OrderExpr("? DESC", bun.Ident("updated_at"))
+		OrderExpr("? DESC", bun.Ident("id"))
 }
 
 // newSelectLocalFollowers returns a new select query for all rows in the follows table with
@@ -354,7 +354,7 @@ func newSelectLocalFollowers(db *DB, accountID string) *bun.SelectQuery {
 				Column("id").
 				Where("? IS NULL", bun.Ident("domain")),
 		).
-		OrderExpr("? DESC", bun.Ident("updated_at"))
+		OrderExpr("? DESC", bun.Ident("id"))
 }
 
 // newSelectBlocks returns a new select query for all rows in the blocks table with account_id = accountID.
@@ -363,5 +363,5 @@ func newSelectBlocks(db *DB, accountID string) *bun.SelectQuery {
 		TableExpr("?", bun.Ident("blocks")).
 		ColumnExpr("?", bun.Ident("?")).
 		Where("? = ?", bun.Ident("account_id"), accountID).
-		OrderExpr("? DESC", bun.Ident("updated_at"))
+		OrderExpr("? DESC", bun.Ident("id"))
 }

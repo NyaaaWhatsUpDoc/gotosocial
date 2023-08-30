@@ -44,8 +44,8 @@ func (t *timeline) Get(ctx context.Context, page *paging.Page[string], prepareNe
 	// TODO: update more of this
 	// timeline code to use page directly
 	// instead of this shim-like method.
-	amount, _ := page.GetLimit()
-	maxID, _ := page.GetMax()
+	amount := page.GetLimit()
+	maxID := page.GetMax()
 	minID := getMinID(page)
 	sinceID := getSinceID(page)
 

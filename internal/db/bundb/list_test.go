@@ -124,7 +124,7 @@ func (suite *ListTestSuite) TestGetListsForAccountID() {
 func (suite *ListTestSuite) TestGetListEntries() {
 	testList, _ := suite.testStructs()
 
-	dbListEntries, err := suite.db.GetListEntries(context.Background(), testList.ID, "", "", "", 0)
+	dbListEntries, err := suite.db.GetListEntries(context.Background(), testList.ID, nil)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -203,7 +203,7 @@ func (suite *ListTestSuite) TestDeleteList() {
 
 	// All entries belonging to this
 	// list should now be deleted.
-	listEntries, err := suite.db.GetListEntries(ctx, testList.ID, "", "", "", 0)
+	listEntries, err := suite.db.GetListEntries(ctx, testList.ID, nil)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -250,7 +250,8 @@ func (suite *ListTestSuite) TestPutListEntries() {
 	dbListEntries, err := suite.db.GetListEntries(
 		gtscontext.SetBarebones(ctx),
 		testList.ID,
-		"", "", "", 0)
+		nil,
+	)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}

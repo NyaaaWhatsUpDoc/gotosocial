@@ -20,9 +20,9 @@ package paging
 type Order int
 
 const (
-	_ Order = iota
-	OrderAscending
+	_default Order = iota
 	OrderDescending
+	OrderAscending
 )
 
 func (i Order) Ascending() bool {
@@ -33,19 +33,13 @@ func (i Order) Descending() bool {
 	return i == OrderDescending
 }
 
-func (i Order) None() bool {
-	return i == 0
-}
-
 func (i Order) String() string {
 	switch i {
-	case 0:
-		return "0"
-	case OrderAscending:
-		return "Ascending"
 	case OrderDescending:
 		return "Descending"
+	case OrderAscending:
+		return "Ascending"
 	default:
-		return "???"
+		return "not-specified"
 	}
 }

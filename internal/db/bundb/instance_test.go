@@ -87,7 +87,7 @@ func (suite *InstanceTestSuite) TestGetInstancePeersIncludeSuspended() {
 }
 
 func (suite *InstanceTestSuite) TestGetInstanceAccounts() {
-	accounts, err := suite.db.GetInstanceAccounts(context.Background(), "fossbros-anonymous.io", "", 10)
+	accounts, err := suite.db.GetInstanceAccounts(context.Background(), "fossbros-anonymous.io", nil)
 	suite.NoError(err)
 	suite.Len(accounts, 1)
 }

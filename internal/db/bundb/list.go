@@ -272,20 +272,6 @@ func (l *listDB) getListEntry(ctx context.Context, lookup string, dbQuery func(*
 }
 
 func (l *listDB) GetListEntries(ctx context.Context, listID string, page *paging.Page[string]) ([]*gtsmodel.ListEntry, error) {
-	var (
-		// Get paging parameters.
-		minID, _ = page.GetMin()
-		maxID, _ = page.GetMax()
-		limit, _ = page.GetLimit()
-		order, _ = page.GetOrder()
-
-		// Make educated guess for slice size
-		entryIDs = make([]string, 0, limit)
-
-		// check requested return order based on paging
-		frontToBack = (order == paging.OrderAscending)
-	)
-
 	q := l.db.
 		NewSelect().
 		TableExpr("? AS ?", bun.Ident("list_entries"), bun.Ident("entry")).
@@ -294,44 +280,19 @@ func (l *listDB) GetListEntries(ctx context.Context, listID string, page *paging
 		// Select only entries belonging to listID.
 		Where("? = ?", bun.Ident("entry.list_id"), listID)
 
-	if maxID != "" {
-		// return only entries LOWER (ie., older) than maxID
-		q = q.Where("? < ?", bun.Ident("entry.id"), maxID)
-	}
-
-	if minID != "" {
-		// return only entries HIGHER (ie., newer) than sinceID
-		q = q.Where("? > ?", bun.Ident("entry.id"), minID)
-	}
-
-	if limit > 0 {
-		// limit amount of entries returned
-		q = q.Limit(limit)
-	}
-
-	if frontToBack {
-		// Page down.
-		q = q.Order("entry.id DESC")
-	} else {
-		// Page up.
-		q = q.Order("entry.id ASC")
-	}
-
-	if err := q.Scan(ctx, &entryIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	entryIDs, err := scanQueryPage(ctx, q, page, "entry.id")
+	if err != nil {
 		return nil, err
 	}
 
 	if len(entryIDs) == 0 {
 		return nil, nil
-	}
-
-	// If we're paging up, we still want entries
-	// to be sorted by ID desc, so reverse ids slice.
-	// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
-	if !frontToBack {
-		for l, r := 0, len(entryIDs)-1; l < r; l, r = l+1, r-1 {
-			entryIDs[l], entryIDs[r] = entryIDs[r], entryIDs[l]
-		}
 	}
 
 	// Select each list entry using its ID to ensure cache used.

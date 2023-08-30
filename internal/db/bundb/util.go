@@ -18,9 +18,11 @@
 package bundb
 
 import (
+	"context"
 	"strings"
 
 	"github.com/superseriousbusiness/gotosocial/internal/db"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/uptrace/bun"
 )
 
@@ -81,6 +83,58 @@ func whereStartsLike(
 		"(?) LIKE ? ESCAPE ?",
 		subject, search, `\`,
 	)
+}
+
+func scanQueryPage[T comparable](ctx context.Context, q *bun.SelectQuery, page *paging.Page[T], col bun.Ident) ([]T, error) {
+	// Zero value of T.
+	var zero T
+
+	// Get paging parameters.
+	min := page.GetMin()
+	max := page.GetMax()
+	limit := page.GetLimit()
+	order := page.GetOrder()
+
+	// Preallocate a destination slice.
+	slice := make([]T, 0, limit)
+
+	if min != zero {
+		// Set page min column value.
+		q = q.Where("? > ?", col, min)
+	}
+
+	if max != zero {
+		// Set page max column value.
+		q = q.Where("? < ?", col, max)
+	}
+
+	if limit > 0 {
+		// Set page limit.
+		q = q.Limit(limit)
+	}
+
+	if order.Ascending() {
+		// Page requires ascending.
+		q = q.OrderExpr("? ASC", col)
+	} else {
+		// Default is descending.
+		q = q.OrderExpr("? DESC", col)
+	}
+
+	if err := q.Scan(ctx, &slice); err != nil {
+		return nil, err
+	}
+
+	if !order.Ascending() {
+		// If we're paging up, we still want objects
+		// to be sorted by col desc, so reverse slice.
+		// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
+		for l, r := 0, len(slice)-1; l < r; l, r = l+1, r-1 {
+			slice[l], slice[r] = slice[r], slice[l]
+		}
+	}
+
+	return slice, nil
 }
 
 // updateWhere parses []db.Where and adds it to the given update query.

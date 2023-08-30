@@ -77,20 +77,6 @@ func (s *searchDB) SearchForAccounts(
 	following bool,
 	offset int,
 ) ([]*gtsmodel.Account, error) {
-	var (
-		// Get paging parameters.
-		minID, _ = page.GetMin()
-		maxID, _ = page.GetMax()
-		limit, _ = page.GetLimit()
-		order, _ = page.GetOrder()
-
-		// Make educated guess for slice size
-		accountIDs = make([]string, 0, limit)
-
-		// check requested return order based on paging
-		frontToBack = (order == paging.OrderAscending)
-	)
-
 	q := s.db.
 		NewSelect().
 		TableExpr("? AS ?", bun.Ident("accounts"), bun.Ident("account")).
@@ -105,16 +91,6 @@ func (s *searchDB) SearchForAccounts(
 				Where("? IS NULL", bun.Ident("account.domain")).
 				WhereOr("? != ?", bun.Ident("account.domain"), bun.Ident("account.username"))
 		})
-
-	if maxID != "" {
-		// Return only items with a LOWER id than maxID.
-		q = q.Where("? < ?", bun.Ident("account.id"), maxID)
-	}
-
-	if minID != "" {
-		// Return only items with a HIGHER id than minID.
-		q = q.Where("? > ?", bun.Ident("account.id"), minID)
-	}
 
 	if following {
 		// Select only from accounts followed by accountID.
@@ -132,34 +108,19 @@ func (s *searchDB) SearchForAccounts(
 	// string within accountText subquery.
 	q = whereLike(q, accountTextSubq, query)
 
-	if limit > 0 {
-		// Limit amount of accounts returned.
-		q = q.Limit(limit)
-	}
-
-	if frontToBack {
-		// Page down.
-		q = q.Order("account.id DESC")
-	} else {
-		// Page up.
-		q = q.Order("account.id ASC")
-	}
-
-	if err := q.Scan(ctx, &accountIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	accountIDs, err := scanQueryPage(ctx, q, page, "account.id")
+	if err != nil {
 		return nil, err
 	}
 
 	if len(accountIDs) == 0 {
 		return nil, nil
-	}
-
-	// If we're paging up, we still want accounts
-	// to be sorted by ID desc, so reverse ids slice.
-	// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
-	if !frontToBack {
-		for l, r := 0, len(accountIDs)-1; l < r; l, r = l+1, r-1 {
-			accountIDs[l], accountIDs[r] = accountIDs[r], accountIDs[l]
-		}
 	}
 
 	accounts := make([]*gtsmodel.Account, 0, len(accountIDs))
@@ -261,20 +222,6 @@ func (s *searchDB) SearchForStatuses(
 	page *paging.Page[string],
 	offset int,
 ) ([]*gtsmodel.Status, error) {
-	var (
-		// Get paging parameters.
-		minID, _ = page.GetMin()
-		maxID, _ = page.GetMax()
-		limit, _ = page.GetLimit()
-		order, _ = page.GetOrder()
-
-		// Make educated guess for slice size
-		statusIDs = make([]string, 0, limit)
-
-		// check requested return order based on paging
-		frontToBack = (order == paging.OrderAscending)
-	)
-
 	q := s.db.
 		NewSelect().
 		TableExpr("? AS ?", bun.Ident("statuses"), bun.Ident("status")).
@@ -290,16 +237,6 @@ func (s *searchDB) SearchForStatuses(
 				WhereOr("? = ?", bun.Ident("status.in_reply_to_account_id"), accountID)
 		})
 
-	if maxID != "" {
-		// return only statuses LOWER (i.e. older) than maxID
-		q.Where("? < ?", bun.Ident("status.id"), maxID)
-	}
-
-	if minID != "" {
-		// return only statuses HIGHER (ie., newer) than minID
-		q = q.Where("? > ?", bun.Ident("status.id"), minID)
-	}
-
 	// Select status text as subquery.
 	statusTextSubq := s.statusText()
 
@@ -307,34 +244,19 @@ func (s *searchDB) SearchForStatuses(
 	// string within statusText subquery.
 	q = whereLike(q, statusTextSubq, query)
 
-	if limit > 0 {
-		// Limit amount of statuses returned.
-		q = q.Limit(limit)
-	}
-
-	if frontToBack {
-		// Page down.
-		q = q.Order("status.id DESC")
-	} else {
-		// Page up.
-		q = q.Order("status.id ASC")
-	}
-
-	if err := q.Scan(ctx, &statusIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	statusIDs, err := scanQueryPage(ctx, q, page, "status.id")
+	if err != nil {
 		return nil, err
 	}
 
 	if len(statusIDs) == 0 {
 		return nil, nil
-	}
-
-	// If we're paging up, we still want statuses
-	// to be sorted by ID desc, so reverse ids slice.
-	// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
-	if !frontToBack {
-		for l, r := 0, len(statusIDs)-1; l < r; l, r = l+1, r-1 {
-			statusIDs[l], statusIDs[r] = statusIDs[r], statusIDs[l]
-		}
 	}
 
 	statuses := make([]*gtsmodel.Status, 0, len(statusIDs))
@@ -393,35 +315,11 @@ func (s *searchDB) SearchForTags(
 	page *paging.Page[string],
 	offset int,
 ) ([]*gtsmodel.Tag, error) {
-	var (
-		// Get paging parameters.
-		minID, _ = page.GetMin()
-		maxID, _ = page.GetMax()
-		limit, _ = page.GetLimit()
-		order, _ = page.GetOrder()
-
-		// Make educated guess for slice size
-		tagIDs = make([]string, 0, limit)
-
-		// check requested return order based on paging
-		frontToBack = (order == paging.OrderAscending)
-	)
-
 	q := s.db.
 		NewSelect().
 		TableExpr("? AS ?", bun.Ident("tags"), bun.Ident("tag")).
 		// Select only IDs from table
 		Column("tag.id")
-
-	if maxID != "" {
-		// return only items with a LOWER id than maxID.
-		q = q.Where("? < ?", bun.Ident("tag.id"), maxID)
-	}
-
-	if minID != "" {
-		// return only tags HIGHER (ie., newer) than minID
-		q = q.Where("? > ?", bun.Ident("tag.id"), minID)
-	}
 
 	// Normalize tag 'name' string.
 	name := strings.TrimSpace(query)
@@ -430,34 +328,19 @@ func (s *searchDB) SearchForTags(
 	// Search using LIKE for tags that start with `name`.
 	q = whereStartsLike(q, bun.Ident("tag.name"), name)
 
-	if limit > 0 {
-		// Limit amount of tags returned.
-		q = q.Limit(limit)
-	}
-
-	if frontToBack {
-		// Page down.
-		q = q.Order("tag.id DESC")
-	} else {
-		// Page up.
-		q = q.Order("tag.id ASC")
-	}
-
-	if err := q.Scan(ctx, &tagIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	tagIDs, err := scanQueryPage(ctx, q, page, "tag.id")
+	if err != nil {
 		return nil, err
 	}
 
 	if len(tagIDs) == 0 {
 		return nil, nil
-	}
-
-	// If we're paging up, we still want tags
-	// to be sorted by ID desc, so reverse slice.
-	// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
-	if !frontToBack {
-		for l, r := 0, len(tagIDs)-1; l < r; l, r = l+1, r-1 {
-			tagIDs[l], tagIDs[r] = tagIDs[r], tagIDs[l]
-		}
 	}
 
 	tags := make([]*gtsmodel.Tag, 0, len(tagIDs))

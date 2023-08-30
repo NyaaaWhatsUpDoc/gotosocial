@@ -81,38 +81,10 @@ func (n *notificationDB) GetAccountNotifications(
 	page *paging.Page[string],
 	excludeTypes []string,
 ) ([]*gtsmodel.Notification, error) {
-	var (
-		// Get paging parameters.
-		minID, _ = page.GetMin()
-		maxID, _ = page.GetMax()
-		limit, _ = page.GetLimit()
-		order, _ = page.GetOrder()
-
-		// Make educated guess for slice size
-		notifIDs = make([]string, 0, limit)
-
-		// check requested return order based on paging
-		frontToBack = (order == paging.OrderAscending)
-	)
-
 	q := n.db.
 		NewSelect().
 		TableExpr("? AS ?", bun.Ident("notifications"), bun.Ident("notification")).
 		Column("notification.id")
-
-	if maxID != "" {
-		// Return only notifs LOWER (ie., older) than maxID.
-		q = q.Where("? < ?", bun.Ident("notification.id"), maxID)
-	}
-
-	if minID != "" {
-		// Return only notifs HIGHER (ie., newer) than minID.
-		q = q.Where("? > ?", bun.Ident("notification.id"), minID)
-	}
-
-	if limit > 0 {
-		q = q.Limit(limit)
-	}
 
 	for _, excludeType := range excludeTypes {
 		// Filter out unwanted notif types.
@@ -122,29 +94,19 @@ func (n *notificationDB) GetAccountNotifications(
 	// Return only notifs for this account.
 	q = q.Where("? = ?", bun.Ident("notification.target_account_id"), accountID)
 
-	if frontToBack {
-		// Page down.
-		q = q.Order("notification.id DESC")
-	} else {
-		// Page up.
-		q = q.Order("notification.id ASC")
-	}
-
-	if err := q.Scan(ctx, &notifIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	notifIDs, err := scanQueryPage(ctx, q, page, "notification.id")
+	if err != nil {
 		return nil, err
 	}
 
 	if len(notifIDs) == 0 {
 		return nil, nil
-	}
-
-	// If we're paging up, we still want notifications
-	// to be sorted by ID desc, so reverse ids slice.
-	// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
-	if !frontToBack {
-		for l, r := 0, len(notifIDs)-1; l < r; l, r = l+1, r-1 {
-			notifIDs[l], notifIDs[r] = notifIDs[r], notifIDs[l]
-		}
 	}
 
 	notifs := make([]*gtsmodel.Notification, 0, len(notifIDs))

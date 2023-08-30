@@ -513,20 +513,6 @@ func (a *accountDB) CountAccountPinned(ctx context.Context, accountID string) (i
 }
 
 func (a *accountDB) GetAccountStatuses(ctx context.Context, accountID string, page *paging.Page[string], excludeReplies bool, excludeReblogs bool, mediaOnly bool, publicOnly bool) ([]*gtsmodel.Status, error) {
-	var (
-		// Get paging parameters.
-		minID, _ = page.GetMin()
-		maxID, _ = page.GetMax()
-		limit, _ = page.GetLimit()
-		order, _ = page.GetOrder()
-
-		// Make educated guess for slice size
-		statusIDs = make([]string, 0, limit)
-
-		// check requested return order based on paging
-		frontToBack = (order == paging.OrderAscending)
-	)
-
 	q := a.db.
 		NewSelect().
 		TableExpr("? AS ?", bun.Ident("statuses"), bun.Ident("status")).
@@ -576,40 +562,19 @@ func (a *accountDB) GetAccountStatuses(ctx context.Context, accountID string, pa
 		q = q.Where("? = ?", bun.Ident("status.visibility"), gtsmodel.VisibilityPublic)
 	}
 
-	if maxID != "" {
-		// return only statuses LOWER (ie., older) than maxID
-		q = q.Where("? < ?", bun.Ident("status.id"), maxID)
-	}
-
-	if minID != "" {
-		// return only statuses HIGHER (ie., newer) than minID
-		q = q.Where("? > ?", bun.Ident("status.id"), minID)
-	}
-
-	if limit > 0 {
-		// limit amount of statuses returned
-		q = q.Limit(limit)
-	}
-
-	if frontToBack {
-		// Page down.
-		q = q.Order("status.id DESC")
-	} else {
-		// Page up.
-		q = q.Order("status.id ASC")
-	}
-
-	if err := q.Scan(ctx, &statusIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	statusIDs, err := scanQueryPage(ctx, q, page, "status.id")
+	if err != nil {
 		return nil, err
 	}
 
-	// If we're paging up, we still want statuses
-	// to be sorted by ID desc, so reverse ids slice.
-	// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
-	if !frontToBack {
-		for l, r := 0, len(statusIDs)-1; l < r; l, r = l+1, r-1 {
-			statusIDs[l], statusIDs[r] = statusIDs[r], statusIDs[l]
-		}
+	if len(statusIDs) == 0 {
+		return nil, nil
 	}
 
 	return a.statusesFromIDs(ctx, statusIDs)
@@ -634,15 +599,6 @@ func (a *accountDB) GetAccountPinnedStatuses(ctx context.Context, accountID stri
 }
 
 func (a *accountDB) GetAccountWebStatuses(ctx context.Context, accountID string, page *paging.Page[string]) ([]*gtsmodel.Status, error) {
-	var (
-		// Get paging parameters.
-		maxID, _ = page.GetMax()
-		limit, _ = page.GetLimit()
-
-		// Make educated guess for slice size
-		statusIDs = make([]string, 0, limit)
-	)
-
 	q := a.db.
 		NewSelect().
 		TableExpr("? AS ?", bun.Ident("statuses"), bun.Ident("status")).
@@ -657,21 +613,19 @@ func (a *accountDB) GetAccountWebStatuses(ctx context.Context, accountID string,
 		// Don't show local-only statuses on the web view.
 		Where("? = ?", bun.Ident("status.federated"), true)
 
-	if maxID != "" {
-		// return only statuses LOWER (ie., older) than maxID
-		q = q.Where("? < ?", bun.Ident("status.id"), maxID)
-	}
-
-	if limit > 0 {
-		// limit amount of statuses returned
-		q = q.Limit(limit)
-	}
-
-	// Page down.
-	q = q.Order("status.id DESC")
-
-	if err := q.Scan(ctx, &statusIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	statusIDs, err := scanQueryPage(ctx, q, page, "status.id")
+	if err != nil {
 		return nil, err
+	}
+
+	if len(statusIDs) == 0 {
+		return nil, nil
 	}
 
 	return a.statusesFromIDs(ctx, statusIDs)

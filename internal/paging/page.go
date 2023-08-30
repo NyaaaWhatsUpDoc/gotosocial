@@ -38,50 +38,54 @@ type Page[T comparable] struct {
 	Limit int
 }
 
-// GetMin is a small helper function to return minimum boundary value or false (checking for nil page and zero minimum).
-func (p *Page[T]) GetMin() (T, bool) {
-	if p == nil || zero(p.Min.Value) {
-		var z T // zero
-		return z, false
+// New is a shim to make it easier to convert older areas of the codebase
+// expecting to always pass-in minID,sinceID,maxID,limit to using these new
+// Page structures. It returns a new Page instance prepared with minID/sinceID
+// minimum Boundary, maxID maximum Boundary, and given limit.
+//
+// TODO: in the future remove this function / show it is only for ID paging.
+func New(minID, sinceID, maxID string, limit int) *Page[string] {
+	return &Page[string]{
+		Min:   MinID(minID, sinceID),
+		Max:   MaxID(maxID),
+		Limit: limit,
 	}
-	return p.Min.Value, true
 }
 
-// GetMax is a small helper function to return maximum boundary value or false (checking for nil page and zero maximum).
-func (p *Page[T]) GetMax() (T, bool) {
-	if p == nil || zero(p.Max.Value) {
+// GetMin is a small helper function to return minimum boundary value (checking for nil page).
+func (p *Page[T]) GetMin() T {
+	if p == nil {
 		var z T // zero
-		return z, false
+		return z
 	}
-	return p.Max.Value, true
+	return p.Min.Value
 }
 
-// GetLimit is a small helper function to return limit or false (checking for nil page and zero limit).
-func (p *Page[T]) GetLimit() (int, bool) {
-	if p == nil || p.Limit <= 0 {
-		return 0, false
+// GetMax is a small helper function to return maximum boundary value (checking for nil page).
+func (p *Page[T]) GetMax() T {
+	if p == nil {
+		var z T // zero
+		return z
 	}
-	return p.Limit, true
+	return p.Max.Value
+}
+
+// GetLimit is a small helper function to return limit (checking for nil page and unusable limit).
+func (p *Page[T]) GetLimit() int {
+	if p == nil || p.Limit < 0 {
+		return 0
+	}
+	return p.Limit
 }
 
 // GetOrder is a small helper function to return page ordering (checking for nil page).
-func (p *Page[T]) GetOrder() (Order, bool) {
-	if p == nil {
-		return 0, false
-	}
-	return p.order(), true
-}
-
-// order returns this Page's ordering.
-func (p *Page[T]) order() Order {
+func (p *Page[T]) GetOrder() Order {
 	switch {
-	// we give preference to the
-	// minimum boundary, as that's
-	// usually where order comes
-	// from, e.g. since_id vs min_id.
-	case !p.Min.Order.None():
+	case p == nil:
+		return 0
+	case p.Min.Order != 0:
 		return p.Min.Order
-	case !p.Max.Order.None():
+	case p.Max.Order != 0:
 		return p.Max.Order
 	default:
 		return 0
@@ -95,7 +99,7 @@ func (p *Page[T]) order() Order {
 func (p *Page[T]) PageAsc(in []T) []T {
 	if p == nil {
 		// no paging.
-		return nil
+		return in
 	}
 
 	// Look for min boundary in input, reslice
@@ -112,9 +116,7 @@ func (p *Page[T]) PageAsc(in []T) []T {
 
 	// Check if either require descending order,
 	// bearing in mind that 'in' is ascending.
-	needDesc := p.order() == OrderDescending
-
-	if needDesc && len(in) > 1 {
+	if p.GetOrder().Descending() && len(in) > 1 {
 		var (
 			// Start at front.
 			i = 0
@@ -155,7 +157,7 @@ func (p *Page[T]) PageAsc(in []T) []T {
 func (p *Page[T]) PageDesc(in []T) []T {
 	if p == nil {
 		// no paging.
-		return nil
+		return in
 	}
 
 	// Look for max boundary in input, reslice
@@ -172,9 +174,7 @@ func (p *Page[T]) PageDesc(in []T) []T {
 
 	// Check if either require ascending order,
 	// bearing in mind that 'in' is descending.
-	needAsc := p.order() == OrderAscending
-
-	if needAsc && len(in) > 1 {
+	if p.GetOrder().Ascending() && len(in) > 1 {
 		var (
 			// Start at front.
 			i = 0

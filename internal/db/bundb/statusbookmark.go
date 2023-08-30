@@ -83,41 +83,29 @@ func (s *statusBookmarkDB) GetStatusBookmarkID(ctx context.Context, accountID st
 }
 
 func (s *statusBookmarkDB) GetStatusBookmarks(ctx context.Context, accountID string, page *paging.Page[string]) ([]*gtsmodel.StatusBookmark, error) {
-	var (
-		// Get paging parameters.
-		minID, _ = page.GetMin()
-		maxID, _ = page.GetMax()
-		limit, _ = page.GetLimit()
-
-		// Make educated guess for slice size
-		bookmarkIDs = make([]string, 0, limit)
-	)
+	if accountID == "" {
+		return nil, errors.New("must provide an account")
+	}
 
 	q := s.db.
 		NewSelect().
 		TableExpr("? AS ?", bun.Ident("status_bookmarks"), bun.Ident("status_bookmark")).
 		Column("status_bookmark.id").
-		Where("? = ?", bun.Ident("status_bookmark.account_id"), accountID).
-		Order("status_bookmark.id DESC")
+		Where("? = ?", bun.Ident("status_bookmark.account_id"), accountID)
 
-	if accountID == "" {
-		return nil, errors.New("must provide an account")
-	}
-
-	if maxID != "" {
-		q = q.Where("? < ?", bun.Ident("status_bookmark.id"), maxID)
-	}
-
-	if minID != "" {
-		q = q.Where("? > ?", bun.Ident("status_bookmark.id"), minID)
-	}
-
-	if limit != 0 {
-		q = q.Limit(limit)
-	}
-
-	if err := q.Scan(ctx, &bookmarkIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	bookmarkIDs, err := scanQueryPage(ctx, q, page, "status_bookmark.id")
+	if err != nil {
 		return nil, err
+	}
+
+	if len(bookmarkIDs) == 0 {
+		return nil, nil
 	}
 
 	bookmarks := make([]*gtsmodel.StatusBookmark, 0, len(bookmarkIDs))

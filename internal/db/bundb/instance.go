@@ -291,9 +291,6 @@ func (i *instanceDB) GetInstancePeers(ctx context.Context, includeSuspended bool
 }
 
 func (i *instanceDB) GetInstanceAccounts(ctx context.Context, domain string, page *paging.Page[string]) ([]*gtsmodel.Account, error) {
-	// Get limit (always >= 0).
-	limit, _ := page.GetLimit()
-
 	// Normalize the domain as punycode.
 	var err error
 	domain, err = util.Punify(domain)
@@ -301,38 +298,31 @@ func (i *instanceDB) GetInstanceAccounts(ctx context.Context, domain string, pag
 		return nil, gtserror.Newf("error punifying domain %s: %w", domain, err)
 	}
 
-	// Make educated guess for slice size
-	accountIDs := make([]string, 0, limit)
-
 	q := i.db.
 		NewSelect().
 		TableExpr("? AS ?", bun.Ident("accounts"), bun.Ident("account")).
 		// Select just the account ID.
 		Column("account.id").
 		// Select accounts belonging to given domain.
-		Where("? = ?", bun.Ident("account.domain"), domain).
-		Order("account.id DESC")
+		Where("? = ?", bun.Ident("account.domain"), domain)
 
-	if maxID, ok := page.GetMax(); ok {
-		q = q.Where("? < ?", bun.Ident("account.id"), maxID)
-	}
-
-	if limit > 0 {
-		q = q.Limit(limit)
-	}
-
-	if err := q.Scan(ctx, &accountIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	accountIDs, err := scanQueryPage(ctx, q, page, "account.id")
+	if err != nil {
 		return nil, err
 	}
 
-	// Catch case of no accounts early.
-	count := len(accountIDs)
-	if count == 0 {
-		return nil, db.ErrNoEntries
+	if len(accountIDs) == 0 {
+		return nil, nil
 	}
 
 	// Select each account by its ID.
-	accounts := make([]*gtsmodel.Account, 0, count)
+	accounts := make([]*gtsmodel.Account, 0, len(accountIDs))
 	for _, id := range accountIDs {
 		account, err := i.state.DB.GetAccountByID(ctx, id)
 		if err != nil {

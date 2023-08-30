@@ -1376,10 +1376,10 @@ func (c *converter) StatusesToASOutboxPage(ctx context.Context, outboxID string,
 	// .id
 	pageIDProp := streams.NewJSONLDIdProperty()
 	pageID := fmt.Sprintf("%s?page=true", outboxID)
-	if minID, _ := page.GetMin(); minID != "" {
+	if minID := page.GetMin(); minID != "" {
 		pageID = fmt.Sprintf("%s&minID=%s", pageID, minID)
 	}
-	if maxID, _ := page.GetMax(); maxID != "" {
+	if maxID := page.GetMax(); maxID != "" {
 		pageID = fmt.Sprintf("%s&maxID=%s", pageID, maxID)
 	}
 	pageIDURI, err := url.Parse(pageID)

@@ -449,7 +449,7 @@ func (suite *InboxPostTestSuite) TestPostDelete() {
 
 	if !testrig.WaitFor(func() bool {
 		// no statuses from foss satan should be left in the database
-		dbStatuses, err := suite.db.GetAccountStatuses(ctx, requestingAccount.ID, 0, false, false, "", "", false, false)
+		dbStatuses, err := suite.db.GetAccountStatuses(ctx, requestingAccount.ID, nil, false, false, false, false)
 		return len(dbStatuses) == 0 && errors.Is(err, db.ErrNoEntries)
 	}) {
 		suite.FailNow("timed out waiting for statuses to be removed")

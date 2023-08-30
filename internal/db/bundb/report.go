@@ -53,21 +53,10 @@ func (r *reportDB) GetReportByID(ctx context.Context, id string) (*gtsmodel.Repo
 }
 
 func (r *reportDB) GetReports(ctx context.Context, resolved *bool, accountID string, targetAccountID string, page *paging.Page[string]) ([]*gtsmodel.Report, error) {
-	var (
-		// Get paging parameters.
-		minID, _ = page.GetMin()
-		maxID, _ = page.GetMax()
-		limit, _ = page.GetLimit()
-
-		// Make educated guess for slice size
-		reportIDs = make([]string, 0, limit)
-	)
-
 	q := r.db.
 		NewSelect().
 		TableExpr("? AS ?", bun.Ident("reports"), bun.Ident("report")).
-		Column("report.id").
-		Order("report.id DESC")
+		Column("report.id")
 
 	if resolved != nil {
 		i := bun.Ident("report.action_taken_by_account_id")
@@ -86,19 +75,14 @@ func (r *reportDB) GetReports(ctx context.Context, resolved *bool, accountID str
 		q = q.Where("? = ?", bun.Ident("report.target_account_id"), targetAccountID)
 	}
 
-	if maxID != "" {
-		q = q.Where("? < ?", bun.Ident("report.id"), maxID)
-	}
-
-	if minID != "" {
-		q = q.Where("? > ?", bun.Ident("report.id"), minID)
-	}
-
-	if limit != 0 {
-		q = q.Limit(limit)
-	}
-
-	if err := q.Scan(ctx, &reportIDs); err != nil {
+	// Scan query page, returning slice of IDs.
+	// The page will add to query (if not nil):
+	// - less than max
+	// - greater than min
+	// - order (default = DESC)
+	// - limit
+	reportIDs, err := scanQueryPage(ctx, q, page, "report.id")
+	if err != nil {
 		return nil, err
 	}
 

@@ -505,11 +505,7 @@ func (s *statusDB) GetStatusChildren(ctx context.Context, status *gtsmodel.Statu
 	children := []*gtsmodel.Status{}
 	for e := foundStatuses.Front(); e != nil; e = e.Next() {
 		// only append children, not the overall parent status
-		entry, ok := e.Value.(*gtsmodel.Status)
-		if !ok {
-			log.Panic(ctx, "found status could not be asserted to *gtsmodel.Status")
-		}
-
+		entry := e.Value.(*gtsmodel.Status) //nolint:forcetypeassert
 		if entry.ID != status.ID {
 			children = append(children, entry)
 		}
