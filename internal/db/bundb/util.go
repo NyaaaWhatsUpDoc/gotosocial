@@ -85,6 +85,7 @@ func whereStartsLike(
 	)
 }
 
+// scanQueryPage ...
 func scanQueryPage[T comparable](ctx context.Context, q *bun.SelectQuery, page *paging.Page[T], col bun.Ident) ([]T, error) {
 	// Zero value of T.
 	var zero T
@@ -113,21 +114,22 @@ func scanQueryPage[T comparable](ctx context.Context, q *bun.SelectQuery, page *
 		q = q.Limit(limit)
 	}
 
-	if order.Ascending() {
-		// Page requires ascending.
-		q = q.OrderExpr("? ASC", col)
-	} else {
+	if !order.Ascending() {
 		// Default is descending.
 		q = q.OrderExpr("? DESC", col)
+	} else {
+		// Page requires ascending.
+		q = q.OrderExpr("? ASC", col)
 	}
 
+	// Perform the query, scanning result into slice.
 	if err := q.Scan(ctx, &slice); err != nil {
 		return nil, err
 	}
 
-	if !order.Ascending() {
+	if order.Ascending() {
 		// If we're paging up, we still want objects
-		// to be sorted by col desc, so reverse slice.
+		// to be sorted by col DESC, so reverse slice.
 		// https://zchee.github.io/golang-wiki/SliceTricks/#reversing
 		for l, r := 0, len(slice)-1; l < r; l, r = l+1, r-1 {
 			slice[l], slice[r] = slice[r], slice[l]

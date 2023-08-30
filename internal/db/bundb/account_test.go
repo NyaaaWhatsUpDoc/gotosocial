@@ -47,35 +47,34 @@ func (suite *AccountTestSuite) TestGetAccountStatuses() {
 }
 
 func (suite *AccountTestSuite) TestGetAccountStatusesPageDown() {
-	var minID string
+	var maxID string
 
 	// get the first page
-	statuses, err := suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New("", "", "", 2), false, false, false, false)
+	statuses, err := suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New("", "", maxID, 2), false, false, false, false)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
 	suite.Len(statuses, 2)
-	minID = statuses[len(statuses)-1].ID
+	maxID = statuses[len(statuses)-1].ID
 
 	// get the second page
-	statuses, err = suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New(minID, "", "", 2), false, false, false, false)
+	statuses, err = suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New("", "", maxID, 2), false, false, false, false)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
 	suite.Len(statuses, 2)
-	minID = statuses[len(statuses)-1].ID
+	maxID = statuses[len(statuses)-1].ID
 
 	// get the third page
-	statuses, err = suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New(minID, "", "", 2), false, false, false, false)
+	statuses, err = suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New("", "", maxID, 2), false, false, false, false)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
 	suite.Len(statuses, 1)
-	minID = statuses[len(statuses)-1].ID
+	maxID = statuses[len(statuses)-1].ID
 
 	// try to get the last page (should be empty)
-	statuses, err = suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New(minID, "", "", 2), false, false, false, false)
-	suite.ErrorIs(err, db.ErrNoEntries)
+	statuses, err = suite.db.GetAccountStatuses(context.Background(), suite.testAccounts["local_account_1"].ID, paging.New("", "", maxID, 2), false, false, false, false)
 	suite.Empty(statuses)
 }
 

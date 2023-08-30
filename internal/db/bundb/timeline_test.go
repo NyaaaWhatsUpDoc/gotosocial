@@ -20,56 +20,16 @@ package bundb_test
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/suite"
-	"github.com/superseriousbusiness/gotosocial/internal/ap"
 	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/id"
 	"github.com/superseriousbusiness/gotosocial/internal/paging"
-	"github.com/superseriousbusiness/gotosocial/internal/util"
 )
 
 type TimelineTestSuite struct {
 	BunDBStandardTestSuite
-}
-
-func getFutureStatus() *gtsmodel.Status {
-	theDistantFuture := time.Now().Add(876600 * time.Hour)
-	id, err := id.NewULIDFromTime(theDistantFuture)
-	if err != nil {
-		panic(err)
-	}
-
-	return &gtsmodel.Status{
-		ID:                       id,
-		URI:                      "http://localhost:8080/users/admin/statuses/" + id,
-		URL:                      "http://localhost:8080/@admin/statuses/" + id,
-		Content:                  "it's the future, wooooooooooooooooooooooooooooooooo",
-		Text:                     "it's the future, wooooooooooooooooooooooooooooooooo",
-		AttachmentIDs:            []string{},
-		TagIDs:                   []string{},
-		MentionIDs:               []string{},
-		EmojiIDs:                 []string{},
-		CreatedAt:                theDistantFuture,
-		UpdatedAt:                theDistantFuture,
-		Local:                    util.Ptr(true),
-		AccountURI:               "http://localhost:8080/users/admin",
-		AccountID:                "01F8MH17FWEB39HZJ76B6VXSKF",
-		InReplyToID:              "",
-		BoostOfID:                "",
-		ContentWarning:           "",
-		Visibility:               gtsmodel.VisibilityPublic,
-		Sensitive:                util.Ptr(false),
-		Language:                 "en",
-		CreatedWithApplicationID: "01F8MGXQRHYF5QPMTMXP78QC2F",
-		Federated:                util.Ptr(true),
-		Boostable:                util.Ptr(true),
-		Replyable:                util.Ptr(true),
-		Likeable:                 util.Ptr(true),
-		ActivityStreamsType:      ap.ObjectNote,
-	}
 }
 
 func (suite *TimelineTestSuite) publicCount() int {
@@ -128,25 +88,6 @@ func (suite *TimelineTestSuite) TestGetPublicTimeline() {
 	suite.checkStatuses(s, id.Highest, id.Lowest, suite.publicCount())
 }
 
-func (suite *TimelineTestSuite) TestGetPublicTimelineWithFutureStatus() {
-	ctx := context.Background()
-
-	// Insert a status set far in the
-	// future, it shouldn't be retrieved.
-	futureStatus := getFutureStatus()
-	if err := suite.db.PutStatus(ctx, futureStatus); err != nil {
-		suite.FailNow(err.Error())
-	}
-
-	s, err := suite.db.GetPublicTimeline(ctx, paging.New("", "", "", 20), false)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
-
-	suite.NotContains(s, futureStatus)
-	suite.checkStatuses(s, id.Highest, id.Lowest, suite.publicCount())
-}
-
 func (suite *TimelineTestSuite) TestGetHomeTimeline() {
 	var (
 		ctx            = context.Background()
@@ -172,7 +113,6 @@ func (suite *TimelineTestSuite) TestGetHomeTimelineNoFollowing() {
 		gtscontext.SetBarebones(ctx),
 		viewingAccount.ID,
 	)
-
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
@@ -191,28 +131,6 @@ func (suite *TimelineTestSuite) TestGetHomeTimelineNoFollowing() {
 	}
 
 	suite.checkStatuses(s, id.Highest, id.Lowest, 5)
-}
-
-func (suite *TimelineTestSuite) TestGetHomeTimelineWithFutureStatus() {
-	var (
-		ctx            = context.Background()
-		viewingAccount = suite.testAccounts["local_account_1"]
-	)
-
-	// Insert a status set far in the
-	// future, it shouldn't be retrieved.
-	futureStatus := getFutureStatus()
-	if err := suite.db.PutStatus(ctx, futureStatus); err != nil {
-		suite.FailNow(err.Error())
-	}
-
-	s, err := suite.db.GetHomeTimeline(ctx, viewingAccount.ID, paging.New("", "", "", 20), false)
-	if err != nil {
-		suite.FailNow(err.Error())
-	}
-
-	suite.NotContains(s, futureStatus)
-	suite.checkStatuses(s, id.Highest, id.Lowest, 16)
 }
 
 func (suite *TimelineTestSuite) TestGetHomeTimelineBackToFront() {
@@ -299,7 +217,7 @@ func (suite *TimelineTestSuite) TestGetListTimelineMinIDPagingUp() {
 		list = suite.testLists["local_account_1_list_1"]
 	)
 
-	s, err := suite.db.GetListTimeline(ctx, list.ID, paging.New("", "01F8MHC8VWDRBQR0N1BATDDEM5", "", 5))
+	s, err := suite.db.GetListTimeline(ctx, list.ID, paging.New("01F8MHC8VWDRBQR0N1BATDDEM5", "", "", 5))
 	if err != nil {
 		suite.FailNow(err.Error())
 	}

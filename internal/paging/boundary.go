@@ -22,18 +22,7 @@ import "fmt"
 // MinID ...
 func MinID(minID, sinceID string) Boundary[string] {
 	switch {
-	case sinceID != "":
-		return Boundary[string]{
-			Name:  "since_id",
-			Value: sinceID,
-
-			// with "since_id", return
-			// as ascending order items,
-			// i.e. newest at lowest idx
-			Order: OrderDescending,
-		}
-	default:
-		// minID is default min type.
+	case minID != "":
 		return Boundary[string]{
 			Name:  "min_id",
 			Value: minID,
@@ -42,6 +31,17 @@ func MinID(minID, sinceID string) Boundary[string] {
 			// as ascending order items,
 			// i.e. oldest at lowest idx
 			Order: OrderAscending,
+		}
+	default:
+		// default min is `since_id`
+		return Boundary[string]{
+			Name:  "since_id",
+			Value: sinceID,
+
+			// with "since_id", return
+			// as ascending order items,
+			// i.e. newest at lowest idx
+			Order: OrderDescending,
 		}
 	}
 }
@@ -53,8 +53,10 @@ func MaxID(maxID string) Boundary[string] {
 		Name:  "max_id",
 		Value: maxID,
 
-		// no order specified
-		Order: 0,
+		// by default uses descending,
+		// as min boundary order always
+		// overrides max boundary order
+		Order: OrderDescending,
 	}
 }
 
@@ -64,7 +66,7 @@ func MinShortcodeDomain(min string) Boundary[string] {
 	return Boundary[string]{
 		Name:  "min_shortcode_domain",
 		Value: min,
-		Order: OrderDescending,
+		Order: OrderAscending,
 	}
 }
 
@@ -75,8 +77,10 @@ func MaxShortcodeDomain(max string) Boundary[string] {
 		Name:  "max_shortcode_domain",
 		Value: max,
 
-		// no order specified
-		Order: 0,
+		// by default uses descending,
+		// as min boundary order always
+		// overrides max boundary order
+		Order: OrderDescending,
 	}
 }
 

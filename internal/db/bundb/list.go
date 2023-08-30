@@ -77,7 +77,7 @@ func (l *listDB) getList(ctx context.Context, lookup string, dbQuery func(*gtsmo
 		return list, nil
 	}
 
-	if err := l.state.DB.PopulateList(ctx, list); err != nil {
+	if err := l.PopulateList(ctx, list); err != nil {
 		return nil, err
 	}
 
@@ -134,7 +134,7 @@ func (l *listDB) PopulateList(ctx context.Context, list *gtsmodel.List) error {
 
 	if list.ListEntries == nil {
 		// List entries are not set, fetch from the database.
-		list.ListEntries, err = l.state.DB.GetListEntries(
+		list.ListEntries, err = l.GetListEntries(
 			gtscontext.SetBarebones(ctx),
 			list.ID,
 			nil,

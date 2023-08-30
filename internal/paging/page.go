@@ -80,9 +80,16 @@ func (p *Page[T]) GetLimit() int {
 
 // GetOrder is a small helper function to return page ordering (checking for nil page).
 func (p *Page[T]) GetOrder() Order {
-	switch {
-	case p == nil:
+	if p == nil {
 		return 0
+	}
+	return p.order()
+}
+
+func (p *Page[T]) order() Order {
+	switch {
+	// minimum boundary order
+	// has the highest priority.
 	case p.Min.Order != 0:
 		return p.Min.Order
 	case p.Max.Order != 0:
@@ -116,7 +123,7 @@ func (p *Page[T]) PageAsc(in []T) []T {
 
 	// Check if either require descending order,
 	// bearing in mind that 'in' is ascending.
-	if p.GetOrder().Descending() && len(in) > 1 {
+	if p.order().Descending() && len(in) > 1 {
 		var (
 			// Start at front.
 			i = 0
@@ -174,7 +181,7 @@ func (p *Page[T]) PageDesc(in []T) []T {
 
 	// Check if either require ascending order,
 	// bearing in mind that 'in' is descending.
-	if p.GetOrder().Ascending() && len(in) > 1 {
+	if p.order().Ascending() && len(in) > 1 {
 		var (
 			// Start at front.
 			i = 0
