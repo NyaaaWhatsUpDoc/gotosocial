@@ -85,7 +85,9 @@ func whereStartsLike(
 	)
 }
 
-// scanQueryPage ...
+// scanQueryPage appends paging parameters to a SELECT query based on given `page` and scanned `col` name. This automatically handles
+// the case of nil `page, adding` min, max, limit and order to the query. Default ordering is DESC, and the returned slice is ALWAYS
+// returned in descending order, even if the database query itself was ascending, as that's how our codebase handles model slices.
 func scanQueryPage[T comparable](ctx context.Context, q *bun.SelectQuery, page *paging.Page[T], col bun.Ident) ([]T, error) {
 	// Zero value of T.
 	var zero T
