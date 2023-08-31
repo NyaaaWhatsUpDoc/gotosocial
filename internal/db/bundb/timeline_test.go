@@ -112,6 +112,7 @@ func (suite *TimelineTestSuite) TestGetHomeTimelineNoFollowing() {
 	follows, err := suite.state.DB.GetAccountFollows(
 		gtscontext.SetBarebones(ctx),
 		viewingAccount.ID,
+		nil, // all account follows
 	)
 	if err != nil {
 		suite.FailNow(err.Error())
@@ -125,7 +126,7 @@ func (suite *TimelineTestSuite) TestGetHomeTimelineNoFollowing() {
 
 	// Query should work fine; though far
 	// fewer statuses will be returned ofc.
-	s, err := suite.db.GetHomeTimeline(ctx, viewingAccount.ID, "", "", "", 20, false)
+	s, err := suite.db.GetHomeTimeline(ctx, viewingAccount.ID, paging.New("", "", "", 20), false)
 	if err != nil {
 		suite.FailNow(err.Error())
 	}
