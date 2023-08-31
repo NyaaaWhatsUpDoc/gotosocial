@@ -31,14 +31,13 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/db/bundb"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
 )
 
 type list struct {
 	dbService  db.DB
 	state      *state.State
-	maxID      string
-	limit      int
 	localOnly  bool
 	remoteOnly bool
 	out        *bufio.Writer
@@ -46,9 +45,16 @@ type list struct {
 
 // Get a list of attachment using a custom filter
 func (l *list) GetAllAttachmentPaths(ctx context.Context, filter func(*gtsmodel.MediaAttachment) string) ([]string, error) {
+	// page for iterative media fetching
+	// from a previous maximum media ID.
+	page := paging.Page[string]{
+		Limit: 200,
+	}
+
 	res := make([]string, 0, 100)
+
 	for {
-		attachments, err := l.dbService.GetAttachments(ctx, l.maxID, l.limit)
+		attachments, err := l.dbService.GetAttachments(ctx, &page)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve media metadata from database: %w", err)
 		}
@@ -64,28 +70,34 @@ func (l *list) GetAllAttachmentPaths(ctx context.Context, filter func(*gtsmodel.
 		// last page to retrieve and we can break the loop. If the
 		// last batch happens to contain exactly the same amount of
 		// items as the limit we'll end up doing one extra query.
-		if len(attachments) < l.limit {
+		if len(attachments) < page.Limit {
 			break
 		}
 
-		// Grab the last ID from the batch and set it as the maxID
-		// that'll be used in the next iteration so we don't get items
-		// we've already seen.
-		l.maxID = attachments[len(attachments)-1].ID
+		// Use last attachment as next page maxID value.
+		page.Max.Value = attachments[len(attachments)-1].ID
 	}
+
 	return res, nil
 }
 
 // Get a list of emojis using a custom filter
 func (l *list) GetAllEmojisPaths(ctx context.Context, filter func(*gtsmodel.Emoji) string) ([]string, error) {
+	// page for iterative media fetching
+	// from a previous maximum media ID.
+	page := paging.Page[string]{
+		Limit: 200,
+	}
+
 	res := make([]string, 0, 100)
+
 	for {
-		attachments, err := l.dbService.GetEmojis(ctx, l.maxID, l.limit)
+		emojis, err := l.dbService.GetEmojis(ctx, &page)
 		if err != nil {
 			return nil, fmt.Errorf("failed to retrieve media metadata from database: %w", err)
 		}
 
-		for _, a := range attachments {
+		for _, a := range emojis {
 			v := filter(a)
 			if v != "" {
 				res = append(res, v)
@@ -96,14 +108,12 @@ func (l *list) GetAllEmojisPaths(ctx context.Context, filter func(*gtsmodel.Emoj
 		// last page to retrieve and we can break the loop. If the
 		// last batch happens to contain exactly the same amount of
 		// items as the limit we'll end up doing one extra query.
-		if len(attachments) < l.limit {
+		if len(emojis) < page.Limit {
 			break
 		}
 
-		// Grab the last ID from the batch and set it as the maxID
-		// that'll be used in the next iteration so we don't get items
-		// we've already seen.
-		l.maxID = attachments[len(attachments)-1].ID
+		// Use last emoji as next page maxID value.
+		page.Max.Value = emojis[len(emojis)-1].ID
 	}
 	return res, nil
 }
@@ -137,8 +147,6 @@ func setupList(ctx context.Context) (*list, error) {
 	return &list{
 		dbService:  dbService,
 		state:      &state,
-		limit:      200,
-		maxID:      "",
 		localOnly:  localOnly,
 		remoteOnly: remoteOnly,
 		out:        bufio.NewWriter(os.Stdout),
