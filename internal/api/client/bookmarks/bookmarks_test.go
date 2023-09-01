@@ -190,7 +190,7 @@ func (suite *BookmarkTestSuite) TestGetBookmarksSingle() {
 	}
 
 	suite.Len(statuses, 1)
-	suite.Equal(`<http://localhost:8080/api/v1/bookmarks?limit=10&max_id=01F8MHD2QCZSZ6WQS2ATVPEYJ9>; rel="next", <http://localhost:8080/api/v1/bookmarks?limit=10&min_id=01F8MHD2QCZSZ6WQS2ATVPEYJ9>; rel="prev"`, linkHeader)
+	suite.Equal(`<http://localhost:8080/api/v1/bookmarks?max_id=01F8MHD2QCZSZ6WQS2ATVPEYJ9&limit=10>; rel="next", <http://localhost:8080/api/v1/bookmarks?since_id=01F8MHD2QCZSZ6WQS2ATVPEYJ9&limit=10>; rel="prev"`, linkHeader)
 }
 
 func (suite *BookmarkTestSuite) TestGetBookmarksMultiple() {
@@ -231,7 +231,7 @@ func (suite *BookmarkTestSuite) TestGetBookmarksMultiple() {
 	}
 
 	suite.Len(statuses, 4)
-	suite.Equal(`<http://localhost:8080/api/v1/bookmarks?limit=10&max_id=01F8MHD2QCZSZ6WQS2ATVPEYJ9>; rel="next", <http://localhost:8080/api/v1/bookmarks?limit=10&min_id=01GSZPGY4ZSHNV0PR3HSBB1DDV>; rel="prev"`, linkHeader)
+	suite.Equal(`<http://localhost:8080/api/v1/bookmarks?max_id=01F8MHD2QCZSZ6WQS2ATVPEYJ9&limit=10>; rel="next", <http://localhost:8080/api/v1/bookmarks?since_id=01GSZPGY4ZSHNV0PR3HSBB1DDV&limit=10>; rel="prev"`, linkHeader)
 }
 
 func (suite *BookmarkTestSuite) TestGetBookmarksMultiplePaging() {
@@ -272,7 +272,7 @@ func (suite *BookmarkTestSuite) TestGetBookmarksMultiplePaging() {
 	}
 
 	suite.Len(statuses, 3)
-	suite.Equal(`<http://localhost:8080/api/v1/bookmarks?limit=10&max_id=01F8MHD2QCZSZ6WQS2ATVPEYJ9>; rel="next", <http://localhost:8080/api/v1/bookmarks?limit=10&min_id=01GSZPGHY3ACEN11D512V6MR0M>; rel="prev"`, linkHeader)
+	suite.Equal(`<http://localhost:8080/api/v1/bookmarks?max_id=01F8MHD2QCZSZ6WQS2ATVPEYJ9&limit=10>; rel="next", <http://localhost:8080/api/v1/bookmarks?since_id=01GSZPGHY3ACEN11D512V6MR0M&limit=10>; rel="prev"`, linkHeader)
 }
 
 func (suite *BookmarkTestSuite) TestGetBookmarksNone() {
@@ -332,7 +332,7 @@ func (suite *BookmarkTestSuite) TestGetBookmarksNonexistentStatus() {
 	}
 
 	suite.Len(statuses, 3)
-	suite.Equal(`<http://localhost:8080/api/v1/bookmarks?limit=10&max_id=01F8MHD2QCZSZ6WQS2ATVPEYJ9>; rel="next", <http://localhost:8080/api/v1/bookmarks?limit=10&min_id=01GSZPGHY3ACEN11D512V6MR0M>; rel="prev"`, linkHeader)
+	suite.Equal(`<http://localhost:8080/api/v1/bookmarks?max_id=01F8MHD2QCZSZ6WQS2ATVPEYJ9&limit=10>; rel="next", <http://localhost:8080/api/v1/bookmarks?since_id=01GSZPGHY3ACEN11D512V6MR0M&limit=10>; rel="prev"`, linkHeader)
 }
 
 func TestBookmarkTestSuite(t *testing.T) {

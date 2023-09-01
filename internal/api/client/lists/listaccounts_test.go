@@ -52,7 +52,6 @@ func (suite *ListAccountsTestSuite) getListAccounts(
 	string, // Link header
 	error,
 ) {
-
 	var (
 		recorder = httptest.NewRecorder()
 		ctx, _   = testrig.CreateGinTestContext(recorder, nil)
@@ -151,8 +150,8 @@ func (suite *ListAccountsTestSuite) TestGetListAccountsPaginatedDefaultLimit() {
 
 	suite.Len(accounts, 2)
 	suite.Equal(
-		`<http://localhost:8080/api/v1/lists/01H0G8E4Q2J3FE3JDWJVWEDCD1/accounts?limit=40&max_id=01H0G89MWVQE0M58VD2HQYMQWH>; rel="next", `+
-			`<http://localhost:8080/api/v1/lists/01H0G8E4Q2J3FE3JDWJVWEDCD1/accounts?limit=40&min_id=01H0G8FFM1AGQDRNGBGGX8CYJQ>; rel="prev"`,
+		`<http://localhost:8080/api/v1/lists/01H0G8E4Q2J3FE3JDWJVWEDCD1/accounts?max_id=01H0G89MWVQE0M58VD2HQYMQWH&limit=40>; rel="next", `+
+			`<http://localhost:8080/api/v1/lists/01H0G8E4Q2J3FE3JDWJVWEDCD1/accounts?since_id=01H0G8FFM1AGQDRNGBGGX8CYJQ&limit=40>; rel="prev"`,
 		link,
 	)
 }
@@ -165,7 +164,7 @@ func (suite *ListAccountsTestSuite) TestGetListAccountsPaginatedNextPage() {
 		maxID                   = ""
 		minID                   = ""
 		sinceID                 = ""
-		limit              *int = func() *int { l := 1; return &l }() // Set to 1.
+		limit              *int = func() *int { l := 2; return &l }() // Set to 2 (min).
 	)
 
 	// First response, ask for 1 account.
@@ -182,10 +181,10 @@ func (suite *ListAccountsTestSuite) TestGetListAccountsPaginatedNextPage() {
 		suite.FailNow(err.Error())
 	}
 
-	suite.Len(accounts, 1)
+	suite.Len(accounts, 2)
 	suite.Equal(
-		`<http://localhost:8080/api/v1/lists/01H0G8E4Q2J3FE3JDWJVWEDCD1/accounts?limit=1&max_id=01H0G8FFM1AGQDRNGBGGX8CYJQ>; rel="next", `+
-			`<http://localhost:8080/api/v1/lists/01H0G8E4Q2J3FE3JDWJVWEDCD1/accounts?limit=1&min_id=01H0G8FFM1AGQDRNGBGGX8CYJQ>; rel="prev"`,
+		`<http://localhost:8080/api/v1/lists/01H0G8E4Q2J3FE3JDWJVWEDCD1/accounts?max_id=01H0G8FFM1AGQDRNGBGGX8CYJQ&limit=2>; rel="next", `+
+			`<http://localhost:8080/api/v1/lists/01H0G8E4Q2J3FE3JDWJVWEDCD1/accounts?since_id=01H0G89MWVQE0M58VD2HQYMQWH&limit=2>; rel="prev"`,
 		link,
 	)
 

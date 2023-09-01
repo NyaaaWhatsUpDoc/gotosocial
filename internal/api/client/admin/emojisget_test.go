@@ -36,7 +36,7 @@ type EmojisGetTestSuite struct {
 func (suite *EmojisGetTestSuite) TestEmojiGet() {
 	recorder := httptest.NewRecorder()
 
-	path := admin.EmojiPath + "?filter=domain:all&limit=1"
+	path := admin.EmojiPath + "?filter=domain:all&limit=2"
 	ctx := suite.newContext(recorder, http.MethodGet, nil, path, "application/json")
 
 	suite.adminModule.EmojisGETHandler(ctx)
@@ -51,17 +51,19 @@ func (suite *EmojisGetTestSuite) TestEmojiGet() {
 		suite.FailNow(err.Error())
 	}
 
-	suite.Len(apiEmojis, 1)
+	suite.Len(apiEmojis, 2)
 	suite.Equal("rainbow", apiEmojis[0].Shortcode)
 	suite.Equal("", apiEmojis[0].Domain)
+	suite.Equal("yell", apiEmojis[1].Shortcode)
+	suite.Equal("fossbros-anonymous.io", apiEmojis[1].Domain)
 
-	suite.Equal(`<http://localhost:8080/api/v1/admin/custom_emojis?limit=1&max_shortcode_domain=rainbow@&filter=domain:all>; rel="next", <http://localhost:8080/api/v1/admin/custom_emojis?limit=1&min_shortcode_domain=rainbow@&filter=domain:all>; rel="prev"`, recorder.Header().Get("link"))
+	suite.Equal(`<http://localhost:8080/api/v1/admin/custom_emojis?filter=domain:all&max_shortcode_domain=yell@fossbros-anonymous.io&limit=2>; rel="next", <http://localhost:8080/api/v1/admin/custom_emojis?filter=domain:all&min_shortcode_domain=rainbow@&limit=2>; rel="prev"`, recorder.Header().Get("link"))
 }
 
 func (suite *EmojisGetTestSuite) TestEmojiGet2() {
 	recorder := httptest.NewRecorder()
 
-	path := admin.EmojiPath + "?filter=domain:all&limit=1&max_shortcode_domain=rainbow@"
+	path := admin.EmojiPath + "?filter=domain:all&limit=2&max_shortcode_domain=rainbow@"
 	ctx := suite.newContext(recorder, http.MethodGet, nil, path, "application/json")
 
 	suite.adminModule.EmojisGETHandler(ctx)
@@ -80,13 +82,13 @@ func (suite *EmojisGetTestSuite) TestEmojiGet2() {
 	suite.Equal("yell", apiEmojis[0].Shortcode)
 	suite.Equal("fossbros-anonymous.io", apiEmojis[0].Domain)
 
-	suite.Equal(`<http://localhost:8080/api/v1/admin/custom_emojis?limit=1&max_shortcode_domain=yell@fossbros-anonymous.io&filter=domain:all>; rel="next", <http://localhost:8080/api/v1/admin/custom_emojis?limit=1&min_shortcode_domain=yell@fossbros-anonymous.io&filter=domain:all>; rel="prev"`, recorder.Header().Get("link"))
+	suite.Equal(`<http://localhost:8080/api/v1/admin/custom_emojis?filter=domain:all&max_shortcode_domain=yell@fossbros-anonymous.io&limit=2>; rel="next", <http://localhost:8080/api/v1/admin/custom_emojis?filter=domain:all&min_shortcode_domain=yell@fossbros-anonymous.io&limit=2>; rel="prev"`, recorder.Header().Get("link"))
 }
 
 func (suite *EmojisGetTestSuite) TestEmojiGet3() {
 	recorder := httptest.NewRecorder()
 
-	path := admin.EmojiPath + "?filter=domain:all&limit=1&min_shortcode_domain=yell@fossbros-anonymous.io"
+	path := admin.EmojiPath + "?filter=domain:all&limit=2&min_shortcode_domain=yell@fossbros-anonymous.io"
 	ctx := suite.newContext(recorder, http.MethodGet, nil, path, "application/json")
 
 	suite.adminModule.EmojisGETHandler(ctx)
@@ -105,7 +107,7 @@ func (suite *EmojisGetTestSuite) TestEmojiGet3() {
 	suite.Equal("rainbow", apiEmojis[0].Shortcode)
 	suite.Equal("", apiEmojis[0].Domain)
 
-	suite.Equal(`<http://localhost:8080/api/v1/admin/custom_emojis?limit=1&max_shortcode_domain=rainbow@&filter=domain:all>; rel="next", <http://localhost:8080/api/v1/admin/custom_emojis?limit=1&min_shortcode_domain=rainbow@&filter=domain:all>; rel="prev"`, recorder.Header().Get("link"))
+	suite.Equal("<http://localhost:8080/api/v1/admin/custom_emojis?filter=domain:all&max_shortcode_domain=rainbow@&limit=2>; rel=\"next\", <http://localhost:8080/api/v1/admin/custom_emojis?filter=domain:all&min_shortcode_domain=rainbow@&limit=2>; rel=\"prev\"", recorder.Header().Get("link"))
 }
 
 func TestEmojisGetTestSuite(t *testing.T) {

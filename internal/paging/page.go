@@ -55,8 +55,8 @@ func New(minID, sinceID, maxID string, limit int) *Page[string] {
 // GetMin is a small helper function to return minimum boundary value (checking for nil page).
 func (p *Page[T]) GetMin() T {
 	if p == nil {
-		var z T // zero
-		return z
+		var zero T
+		return zero
 	}
 	return p.Min.Value
 }
@@ -64,8 +64,8 @@ func (p *Page[T]) GetMin() T {
 // GetMax is a small helper function to return maximum boundary value (checking for nil page).
 func (p *Page[T]) GetMax() T {
 	if p == nil {
-		var z T // zero
-		return z
+		var zero T
+		return zero
 	}
 	return p.Max.Value
 }
@@ -87,12 +87,26 @@ func (p *Page[T]) GetOrder() Order {
 }
 
 func (p *Page[T]) order() Order {
+	var (
+		// Check if min/max values set.
+		minValue = zero(p.Min.Value)
+		maxValue = zero(p.Max.Value)
+
+		// Check if min/max orders set.
+		minOrder = (p.Min.Order != 0)
+		maxOrder = (p.Max.Order != 0)
+	)
+
 	switch {
-	// minimum boundary order
-	// has the highest priority.
-	case p.Min.Order != 0:
+	// Boundaries with a value AND order set
+	// take priority. Min always comes first.
+	case minValue && minOrder:
 		return p.Min.Order
-	case p.Max.Order != 0:
+	case maxValue && maxOrder:
+		return p.Max.Order
+	case minOrder:
+		return p.Min.Order
+	case maxOrder:
 		return p.Max.Order
 	default:
 		return 0
@@ -230,7 +244,7 @@ func (p *Page[T]) Next(max T) *Page[T] {
 	p2.Limit = p.Limit
 
 	// Create new from old.
-	p2.Max = p.Max.New(max)
+	p2.Max = p.Max.new(max)
 
 	return p2
 }
@@ -250,7 +264,7 @@ func (p *Page[T]) Prev(min T) *Page[T] {
 	p2.Limit = p.Limit
 
 	// Create new from old.
-	p2.Min = p.Min.New(min)
+	p2.Min = p.Min.new(min)
 
 	return p2
 }

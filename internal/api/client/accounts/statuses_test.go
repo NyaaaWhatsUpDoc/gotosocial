@@ -73,7 +73,7 @@ func (suite *AccountStatusesTestSuite) TestGetStatusesPublicOnly() {
 		suite.Equal(apimodel.VisibilityPublic, s.Visibility)
 	}
 
-	suite.Equal(`<http://localhost:8080/api/v1/accounts/01F8MH17FWEB39HZJ76B6VXSKF/statuses?limit=20&max_id=01F8MH75CBF9JFX4ZAD54N0W0R&exclude_replies=false&exclude_reblogs=false&pinned=false&only_media=false&only_public=true>; rel="next", <http://localhost:8080/api/v1/accounts/01F8MH17FWEB39HZJ76B6VXSKF/statuses?limit=20&min_id=01G36SF3V6Y6V5BF9P4R7PQG7G&exclude_replies=false&exclude_reblogs=false&pinned=false&only_media=false&only_public=true>; rel="prev"`, result.Header.Get("link"))
+	suite.Equal(`<http://localhost:8080/api/v1/accounts/01F8MH17FWEB39HZJ76B6VXSKF/statuses?exclude_replies=false&exclude_reblogs=false&pinned=false&only_media=false&only_public=true&max_id=01F8MH75CBF9JFX4ZAD54N0W0R&limit=20>; rel="next", <http://localhost:8080/api/v1/accounts/01F8MH17FWEB39HZJ76B6VXSKF/statuses?exclude_replies=false&exclude_reblogs=false&pinned=false&only_media=false&only_public=true&since_id=01G36SF3V6Y6V5BF9P4R7PQG7G&limit=20>; rel="prev"`, result.Header.Get("link"))
 }
 
 func (suite *AccountStatusesTestSuite) TestGetStatusesPublicOnlyMediaOnly() {
@@ -114,7 +114,7 @@ func (suite *AccountStatusesTestSuite) TestGetStatusesPublicOnlyMediaOnly() {
 		suite.Equal(apimodel.VisibilityPublic, s.Visibility)
 	}
 
-	suite.Equal(`<http://localhost:8080/api/v1/accounts/01F8MH17FWEB39HZJ76B6VXSKF/statuses?limit=20&max_id=01F8MH75CBF9JFX4ZAD54N0W0R&exclude_replies=false&exclude_reblogs=false&pinned=false&only_media=true&only_public=true>; rel="next", <http://localhost:8080/api/v1/accounts/01F8MH17FWEB39HZJ76B6VXSKF/statuses?limit=20&min_id=01F8MH75CBF9JFX4ZAD54N0W0R&exclude_replies=false&exclude_reblogs=false&pinned=false&only_media=true&only_public=true>; rel="prev"`, result.Header.Get("link"))
+	suite.Equal(`<http://localhost:8080/api/v1/accounts/01F8MH17FWEB39HZJ76B6VXSKF/statuses?exclude_replies=false&exclude_reblogs=false&pinned=false&only_media=true&only_public=true&max_id=01F8MH75CBF9JFX4ZAD54N0W0R&limit=20>; rel="next", <http://localhost:8080/api/v1/accounts/01F8MH17FWEB39HZJ76B6VXSKF/statuses?exclude_replies=false&exclude_reblogs=false&pinned=false&only_media=true&only_public=true&since_id=01F8MH75CBF9JFX4ZAD54N0W0R&limit=20>; rel="prev"`, result.Header.Get("link"))
 }
 
 func (suite *AccountStatusesTestSuite) TestGetStatusesPinnedOnlyPublicPins() {

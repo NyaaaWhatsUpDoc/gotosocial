@@ -63,7 +63,7 @@ func (suite *ReportsGetTestSuite) getReports(
 	ctx.Set(oauth.SessionAuthorizedUser, user)
 
 	// create the request URI
-	requestPath := admin.ReportsPath + "?" + admin.LimitKey + "=" + strconv.Itoa(limit)
+	requestPath := admin.ReportsPath + "?"
 	if resolved != nil {
 		requestPath = requestPath + "&" + admin.ResolvedKey + "=" + strconv.FormatBool(*resolved)
 	}
@@ -81,6 +81,9 @@ func (suite *ReportsGetTestSuite) getReports(
 	}
 	if minID != "" {
 		requestPath = requestPath + "&" + admin.MinIDKey + "=" + minID
+	}
+	if limit != 0 {
+		requestPath = requestPath + "&" + admin.LimitKey + "=" + strconv.Itoa(limit)
 	}
 	baseURI := config.GetProtocol() + "://" + config.GetHost()
 	requestURI := baseURI + "/api/" + requestPath
@@ -542,7 +545,7 @@ func (suite *ReportsGetTestSuite) TestReportsGetAll() {
   }
 ]`, string(b))
 
-	suite.Equal(`<http://localhost:8080/api/v1/admin/reports?limit=20&max_id=01GP3AWY4CRDVRNZKW0TEAMB5R>; rel="next", <http://localhost:8080/api/v1/admin/reports?limit=20&min_id=01GP3DFY9XQ1TJMZT5BGAZPXX7>; rel="prev"`, link)
+	suite.Equal(`<http://localhost:8080/api/v1/admin/reports?max_id=01GP3AWY4CRDVRNZKW0TEAMB5R&limit=20>; rel="next", <http://localhost:8080/api/v1/admin/reports?since_id=01GP3DFY9XQ1TJMZT5BGAZPXX7&limit=20>; rel="prev"`, link)
 }
 
 func (suite *ReportsGetTestSuite) TestReportsGetCreatedByAccount() {
@@ -763,7 +766,7 @@ func (suite *ReportsGetTestSuite) TestReportsGetCreatedByAccount() {
   }
 ]`, string(b))
 
-	suite.Equal(`<http://localhost:8080/api/v1/admin/reports?limit=20&max_id=01GP3AWY4CRDVRNZKW0TEAMB5R&account_id=01F8MH5NBDF2MV7CTC4Q5128HF>; rel="next", <http://localhost:8080/api/v1/admin/reports?limit=20&min_id=01GP3AWY4CRDVRNZKW0TEAMB5R&account_id=01F8MH5NBDF2MV7CTC4Q5128HF>; rel="prev"`, link)
+	suite.Equal(`<http://localhost:8080/api/v1/admin/reports?account_id=01F8MH5NBDF2MV7CTC4Q5128HF&max_id=01GP3AWY4CRDVRNZKW0TEAMB5R&limit=20>; rel="next", <http://localhost:8080/api/v1/admin/reports?account_id=01F8MH5NBDF2MV7CTC4Q5128HF&since_id=01GP3AWY4CRDVRNZKW0TEAMB5R&limit=20>; rel="prev"`, link)
 }
 
 func (suite *ReportsGetTestSuite) TestReportsGetTargetAccount() {
@@ -984,7 +987,7 @@ func (suite *ReportsGetTestSuite) TestReportsGetTargetAccount() {
   }
 ]`, string(b))
 
-	suite.Equal(`<http://localhost:8080/api/v1/admin/reports?limit=20&max_id=01GP3AWY4CRDVRNZKW0TEAMB5R&target_account_id=01F8MH5ZK5VRH73AKHQM6Y9VNX>; rel="next", <http://localhost:8080/api/v1/admin/reports?limit=20&min_id=01GP3AWY4CRDVRNZKW0TEAMB5R&target_account_id=01F8MH5ZK5VRH73AKHQM6Y9VNX>; rel="prev"`, link)
+	suite.Equal(`<http://localhost:8080/api/v1/admin/reports?target_account_id=01F8MH5ZK5VRH73AKHQM6Y9VNX&max_id=01GP3AWY4CRDVRNZKW0TEAMB5R&limit=20>; rel="next", <http://localhost:8080/api/v1/admin/reports?target_account_id=01F8MH5ZK5VRH73AKHQM6Y9VNX&since_id=01GP3AWY4CRDVRNZKW0TEAMB5R&limit=20>; rel="prev"`, link)
 }
 
 func (suite *ReportsGetTestSuite) TestReportsGetResolvedTargetAccount() {
@@ -1024,8 +1027,8 @@ func (suite *ReportsGetTestSuite) TestReportsGetZeroLimit() {
 	suite.NoError(err)
 	suite.Len(reports, 2)
 
-	// Limit in Link header should be set to 100
-	suite.Equal(`<http://localhost:8080/api/v1/admin/reports?limit=100&max_id=01GP3AWY4CRDVRNZKW0TEAMB5R>; rel="next", <http://localhost:8080/api/v1/admin/reports?limit=100&min_id=01GP3DFY9XQ1TJMZT5BGAZPXX7>; rel="prev"`, link)
+	// Limit in Link header should be set to 40 (default)
+	suite.Equal(`<http://localhost:8080/api/v1/admin/reports?max_id=01GP3AWY4CRDVRNZKW0TEAMB5R&limit=40>; rel="next", <http://localhost:8080/api/v1/admin/reports?since_id=01GP3DFY9XQ1TJMZT5BGAZPXX7&limit=40>; rel="prev"`, link)
 }
 
 func (suite *ReportsGetTestSuite) TestReportsGetHighLimit() {
@@ -1038,7 +1041,7 @@ func (suite *ReportsGetTestSuite) TestReportsGetHighLimit() {
 	suite.Len(reports, 2)
 
 	// Limit in Link header should be set to 100
-	suite.Equal(`<http://localhost:8080/api/v1/admin/reports?limit=100&max_id=01GP3AWY4CRDVRNZKW0TEAMB5R>; rel="next", <http://localhost:8080/api/v1/admin/reports?limit=100&min_id=01GP3DFY9XQ1TJMZT5BGAZPXX7>; rel="prev"`, link)
+	suite.Equal(`<http://localhost:8080/api/v1/admin/reports?max_id=01GP3AWY4CRDVRNZKW0TEAMB5R&limit=100>; rel="next", <http://localhost:8080/api/v1/admin/reports?since_id=01GP3DFY9XQ1TJMZT5BGAZPXX7&limit=100>; rel="prev"`, link)
 }
 
 func TestReportsGetTestSuite(t *testing.T) {

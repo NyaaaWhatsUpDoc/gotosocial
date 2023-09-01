@@ -19,7 +19,9 @@ package paging
 
 import "fmt"
 
-// MinID ...
+// MinID returns an ID boundary with given min ID value,
+// using either the `since_id`,"DESC" name,ordering or
+// `min_id`,"ASC" name,ordering depending on which is set.
 func MinID(minID, sinceID string) Boundary[string] {
 	switch {
 	case minID != "":
@@ -39,14 +41,14 @@ func MinID(minID, sinceID string) Boundary[string] {
 			Value: sinceID,
 
 			// with "since_id", return
-			// as ascending order items,
+			// as descending order items,
 			// i.e. newest at lowest idx
 			Order: OrderDescending,
 		}
 	}
 }
 
-// MaxID returns a boundary with given maximum
+// MaxID returns an ID boundary with given max
 // ID value, and the "max_id" query key set.
 func MaxID(maxID string) Boundary[string] {
 	return Boundary[string]{
@@ -54,7 +56,7 @@ func MaxID(maxID string) Boundary[string] {
 		Value: maxID,
 
 		// by default uses descending,
-		// as min boundary order always
+		// but min boundary order always
 		// overrides max boundary order
 		Order: OrderDescending,
 	}
@@ -66,6 +68,10 @@ func MinShortcodeDomain(min string) Boundary[string] {
 	return Boundary[string]{
 		Name:  "min_shortcode_domain",
 		Value: min,
+
+		// with "min_shortcode_domain",
+		// return as ascending order items,
+		// i.e. oldest at lowest idx
 		Order: OrderAscending,
 	}
 }
@@ -78,7 +84,7 @@ func MaxShortcodeDomain(max string) Boundary[string] {
 		Value: max,
 
 		// by default uses descending,
-		// as min boundary order always
+		// but min boundary order always
 		// overrides max boundary order
 		Order: OrderDescending,
 	}
@@ -91,8 +97,9 @@ type Boundary[T comparable] struct {
 	Order Order
 }
 
-// New ...
-func (b Boundary[T]) New(value T) Boundary[T] {
+// new creates a new Boundary with the same ordering and name
+// as the original (receiving), but with the new provided value.
+func (b Boundary[T]) new(value T) Boundary[T] {
 	return Boundary[T]{
 		Name:  b.Name,
 		Value: value,
