@@ -26,6 +26,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // apiDomainBlock is a cheeky shortcut for returning
@@ -87,14 +88,15 @@ func (p *Processor) rangeDomainAccounts(
 	domain string,
 	rangeF func(*gtsmodel.Account),
 ) error {
-	var (
-		limit = 50   // Limit selection to avoid spiking mem/cpu.
-		maxID string // Start with empty string to select from top.
-	)
+	// page for iterative account fetching
+	// from a previous maximum account ID.
+	page := paging.Page[string]{
+		Limit: 50, // to prevent spiking mem/cpu
+	}
 
 	for {
 		// Get (next) page of accounts.
-		accounts, err := p.state.DB.GetInstanceAccounts(ctx, domain, maxID, limit)
+		accounts, err := p.state.DB.GetInstanceAccounts(ctx, domain, &page)
 		if err != nil && !errors.Is(err, db.ErrNoEntries) {
 			// Real db error.
 			return gtserror.Newf("db error getting instance accounts: %w", err)
@@ -105,8 +107,8 @@ func (p *Processor) rangeDomainAccounts(
 			return nil
 		}
 
-		// Set next max ID for paging down.
-		maxID = accounts[len(accounts)-1].ID
+		// Use last attachment as next page maxID value.
+		page.Max.Value = accounts[len(accounts)-1].ID
 
 		// Call provided range function.
 		for _, account := range accounts {
