@@ -271,20 +271,9 @@ func New(cfg Config) *Client {
 	}
 
 	// Set underlying HTTP client roundtripper.
-	transport := &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
-		ForceAttemptHTTP2:     true,
-		DialContext:           d.DialContext,
-		TLSClientConfig:       tlsClientConfig,
-		MaxIdleConns:          cfg.MaxIdleConns,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-		ReadBufferSize:        cfg.ReadBufferSize,
-		WriteBufferSize:       cfg.WriteBufferSize,
-		DisableCompression:    cfg.DisableCompression,
-	}
-	c.client.Transport = transport
+	c.client.Transport = newHTTP1or2or3Transport(
+		d, sanitizer, tlsClientConfig, cfg,
+	)
 
 	// Initiate bad hosts lookup cache.
 	c.badHosts.Init(0, 1000, time.Hour)
