@@ -28,6 +28,8 @@ import (
 	"codeberg.org/gruf/go-bytesize"
 	"codeberg.org/gruf/go-debug"
 	"github.com/gin-gonic/gin"
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
 	"github.com/superseriousbusiness/gotosocial/internal/config"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
@@ -48,6 +50,7 @@ const (
 type Router struct {
 	engine *gin.Engine
 	srv    *http.Server
+	h3Srv  *http3.Server
 }
 
 // New returns a new Router, which wraps
@@ -112,9 +115,18 @@ func New(ctx context.Context) (*Router, error) {
 		BaseContext:       baseCtx,
 	}
 
+	s3 := &http3.Server{
+		Addr:    addr,
+		Handler: handler,
+		QuicConfig: &quic.Config{
+			MaxIdleTimeout: idleTimeout,
+		},
+	}
+
 	return &Router{
 		engine: engine,
 		srv:    s,
+		h3Srv:  s3,
 	}, nil
 }
 
@@ -128,8 +140,9 @@ func (r *Router) Start() {
 		// By default this points to a regular
 		// HTTP listener, but will be changed to
 		// TLS if custom certs or LE are enabled.
-		listen func() error
-		err    error
+		listen   func() error
+		listenh3 func() error
+		err      error
 
 		certFile  = config.GetTLSCertificateChain()
 		keyFile   = config.GetTLSCertificateKey()
@@ -142,11 +155,11 @@ func (r *Router) Start() {
 		// During config validation we already checked
 		// that either both or neither of Chain and Key
 		// are set, so we can forego checking again here.
-		listen, err = r.customTLS(certFile, keyFile)
+		listen, listenh3, err = r.customTLS(certFile, keyFile)
 
 	// TLS with letsencrypt.
 	case leEnabled:
-		listen, err = r.letsEncryptTLS()
+		listen, listenh3, err = r.letsEncryptTLS()
 
 	// Default listen. TLS must
 	// be handled by reverse proxy.
@@ -170,13 +183,21 @@ func (r *Router) Start() {
 		r.srv.WriteTimeout = 0
 	}
 
-	// Start the main listener.
+	// Start the main listeners.
 	go func() {
 		log.Infof(nil, "listening on %s", r.srv.Addr)
 		if err := listen(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf(nil, "listen: %s", err)
 		}
 	}()
+	if listenh3 != nil {
+		go func() {
+			log.Infof(nil, "listening on h3://%s", r.h3Srv.Addr)
+			if err := listenh3(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf(nil, "listen: %s", err)
+			}
+		}()
+	}
 }
 
 // Stop shuts down the router nicely
@@ -189,6 +210,10 @@ func (r *Router) Stop(ctx context.Context) error {
 		return fmt.Errorf("error shutting down http router: %s", err)
 	}
 
+	if err := r.h3Srv.CloseGracefully(shutdownTimeout); err != nil {
+		return fmt.Errorf("error shutting down http3 router: %s", err)
+	}
+
 	log.Info(nil, "http router closed connections and shut down gracefully")
 	return nil
 }
@@ -198,7 +223,11 @@ func (r *Router) Stop(ctx context.Context) error {
 func (r *Router) customTLS(
 	certFile string,
 	keyFile string,
-) (func() error, error) {
+) (
+	func() error,
+	func() error,
+	error,
+) {
 	// Load certificates from disk.
 	cer, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
@@ -207,7 +236,7 @@ func (r *Router) customTLS(
 				"PEM-encoded and can be read by this process: %w",
 			certFile, keyFile, err,
 		)
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Override server's TLSConfig.
@@ -215,10 +244,12 @@ func (r *Router) customTLS(
 		MinVersion:   tls.VersionTLS12,
 		Certificates: []tls.Certificate{cer},
 	}
+	r.h3Srv.TLSConfig = r.srv.TLSConfig
 
 	// Update listen function to use custom TLS.
 	listen := func() error { return r.srv.ListenAndServeTLS("", "") }
-	return listen, nil
+	listenh3 := func() error { return r.h3Srv.ListenAndServeTLS("", "") }
+	return listen, listenh3, nil
 }
 
 // letsEncryptTLS modifies the router's underlying http
@@ -226,7 +257,11 @@ func (r *Router) customTLS(
 //
 // It also starts a listener on the configured LetsEncrypt
 // port to validate LE requests.
-func (r *Router) letsEncryptTLS() (func() error, error) {
+func (r *Router) letsEncryptTLS() (
+	func() error,
+	func() error,
+	error,
+) {
 	acm := &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist(config.GetHost()),
@@ -236,6 +271,7 @@ func (r *Router) letsEncryptTLS() (func() error, error) {
 
 	// Override server's TLSConfig.
 	r.srv.TLSConfig = acm.TLSConfig()
+	r.h3Srv.TLSConfig = r.srv.TLSConfig
 
 	// Prepare a fallback handler for LetsEncrypt.
 	//
@@ -275,5 +311,6 @@ func (r *Router) letsEncryptTLS() (func() error, error) {
 
 	// Update listen function to use LetsEncrypt TLS.
 	listen := func() error { return r.srv.ListenAndServeTLS("", "") }
-	return listen, nil
+	listenh3 := func() error { return r.h3Srv.ListenAndServeTLS("", "") }
+	return listen, listenh3, nil
 }
