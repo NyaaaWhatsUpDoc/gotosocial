@@ -33,10 +33,12 @@ import (
 
 	"codeberg.org/gruf/go-bytesize"
 	"codeberg.org/gruf/go-byteutil"
-	"codeberg.org/gruf/go-cache/v3"
+	"codeberg.org/gruf/go-cache/v3/ttl"
 	errorsv2 "codeberg.org/gruf/go-errors/v2"
 	"codeberg.org/gruf/go-iotools"
 	"codeberg.org/gruf/go-kv"
+	"github.com/quic-go/quic-go"
+	"github.com/quic-go/quic-go/http3"
 	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
@@ -55,6 +57,111 @@ var (
 	// ErrBodyTooLarge is returned when a received response body is above predefined limit (default 40MB).
 	ErrBodyTooLarge = errors.New("body size too large")
 )
+
+type HTTP1or2Or3Transport struct {
+	HTTP1or2 http.Transport
+	HTTP3    http3.RoundTripper
+	h3Hosts  ttl.Cache[string, bool]
+}
+
+func newHTTP1or2or3Transport(d *net.Dialer, s *Sanitizer, tlsCfg *tls.Config, cfg Config) *HTTP1or2Or3Transport {
+	var t HTTP1or2Or3Transport
+
+	// Prepare the main HTTP v1+2 transport.
+	t.HTTP1or2.Proxy = http.ProxyFromEnvironment
+	t.HTTP1or2.ForceAttemptHTTP2 = true
+	t.HTTP1or2.DialContext = d.DialContext
+	t.HTTP1or2.TLSClientConfig = tlsCfg
+	t.HTTP1or2.MaxIdleConns = cfg.MaxIdleConns
+	t.HTTP1or2.IdleConnTimeout = 90 * time.Second
+	t.HTTP1or2.TLSHandshakeTimeout = 10 * time.Second
+	t.HTTP1or2.ExpectContinueTimeout = 1 * time.Second
+	t.HTTP1or2.ReadBufferSize = cfg.ReadBufferSize
+	t.HTTP1or2.WriteBufferSize = cfg.WriteBufferSize
+	t.HTTP1or2.DisableCompression = cfg.DisableCompression
+
+	// Prepare the solely HTTP3 transport.
+	t.HTTP3.QuicConfig = &quic.Config{
+		MaxIdleTimeout:       t.HTTP1or2.IdleConnTimeout,
+		HandshakeIdleTimeout: t.HTTP1or2.TLSHandshakeTimeout,
+	}
+	t.HTTP3.TLSClientConfig = tlsCfg
+	t.HTTP3.DisableCompression = cfg.DisableCompression
+	t.HTTP3.Dial = func(ctx context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (quic.EarlyConnection, error) {
+		// Resolve given incoming provided UDP address.
+		udpAddr, err := net.ResolveUDPAddr("udp", addr)
+		if err != nil {
+			return nil, err
+		}
+
+		// Get UDP address IP as netip.Addr type.
+		addrIP, _ := netip.AddrFromSlice(udpAddr.IP)
+
+		// Pass address through our sanitizer for safety.
+		if err := s.sanitize("udp", addrIP); err != nil {
+			return nil, err
+		}
+
+		// Open UDP listener on next available port.
+		udpConn, err := net.ListenUDP("udp",
+			&net.UDPAddr{IP: net.IPv4zero, Port: 0},
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Pass on to quic to handle rest of dial procedure.
+		return quic.DialEarly(ctx, udpConn, udpAddr, tlsCfg, cfg)
+	}
+
+	// Initiate http3 hosts lookup cache.
+	t.h3Hosts.Init(0, 1000, time.Hour)
+	if !t.h3Hosts.Start(time.Minute) {
+		log.Panic(nil, "failed to start bad hosts cache")
+	}
+
+	return &t
+}
+
+func (t *HTTP1or2Or3Transport) RoundTrip(r *http.Request) (*http.Response, error) {
+
+	// Get request hostname.
+	host := r.URL.Hostname()
+
+	// Check whether we have a cached value
+	// for whether this host supports http3.
+	h3Enabled, ok := t.h3Hosts.Get(host)
+
+	if h3Enabled {
+		// Use HTTP3 roundtripper.
+		log.Warnf(r.Context(), "http3 request: %s", host)
+		return t.HTTP3.RoundTrip(r)
+	} else if ok {
+		// Use HTTP1+2 roundrtipper.
+		return t.HTTP1or2.RoundTrip(r)
+	}
+
+	// First, attempt via HTTP3 transport.
+	rsp, err := t.HTTP3.RoundTrip(r)
+
+	// Be overly cautious and assume
+	// that any kind of transport err
+	// indicates missing http3 support.
+	if err != nil {
+
+		// Set as h3 unsupported.
+		t.h3Hosts.Set(host, false)
+
+		// Fallback to v1/2 roundtripper.
+		return t.HTTP1or2.RoundTrip(r)
+	}
+
+	// Set as h3 supported.
+	t.h3Hosts.Set(host, true)
+
+	log.Warnf(r.Context(), "http3 request: %s", host)
+	return rsp, err
+}
 
 // Config provides configuration details for setting up a new
 // instance of httpclient.Client{}. Within are a subset of the
@@ -108,7 +215,7 @@ type Config struct {
 //   - request logging
 type Client struct {
 	client   http.Client
-	badHosts cache.TTLCache[string, struct{}]
+	badHosts ttl.Cache[string, struct{}]
 	bodyMax  int64
 }
 
@@ -139,10 +246,11 @@ func New(cfg Config) *Client {
 	}
 
 	// Protect dialer with IP range sanitizer.
-	d.Control = (&Sanitizer{
+	sanitizer := &Sanitizer{
 		Allow: cfg.AllowRanges,
 		Block: cfg.BlockRanges,
-	}).Sanitize
+	}
+	d.Control = sanitizer.Sanitize
 
 	// Prepare client fields.
 	c.client.Timeout = cfg.Timeout
@@ -163,7 +271,7 @@ func New(cfg Config) *Client {
 	}
 
 	// Set underlying HTTP client roundtripper.
-	c.client.Transport = &http.Transport{
+	transport := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		ForceAttemptHTTP2:     true,
 		DialContext:           d.DialContext,
@@ -176,12 +284,12 @@ func New(cfg Config) *Client {
 		WriteBufferSize:       cfg.WriteBufferSize,
 		DisableCompression:    cfg.DisableCompression,
 	}
+	c.client.Transport = transport
 
-	// Initiate outgoing bad hosts lookup cache.
-	c.badHosts = cache.NewTTL[string, struct{}](0, 1000, 0)
-	c.badHosts.SetTTL(time.Hour, false)
+	// Initiate bad hosts lookup cache.
+	c.badHosts.Init(0, 1000, time.Hour)
 	if !c.badHosts.Start(time.Minute) {
-		log.Panic(nil, "failed to start transport controller cache")
+		log.Panic(nil, "failed to start bad hosts cache")
 	}
 
 	return &c

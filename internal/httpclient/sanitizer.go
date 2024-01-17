@@ -19,6 +19,7 @@ package httpclient
 
 import (
 	"net/netip"
+	"strings"
 	"syscall"
 )
 
@@ -67,24 +68,21 @@ type Sanitizer struct {
 
 // Sanitize implements the required net.Dialer.Control function signature.
 func (s *Sanitizer) Sanitize(ntwrk, addr string, _ syscall.RawConn) error {
-	// Parse IP+port from addr
-	ipport, err := netip.ParseAddrPort(addr)
+	ip, err := netip.ParseAddr(dropPort(addr))
 	if err != nil {
 		return err
 	}
+	return s.sanitize(ntwrk, ip)
+}
 
+func (s *Sanitizer) sanitize(ntwrk string, ip netip.Addr) error {
 	// Ensure valid network.
-	const (
-		tcp4 = "tcp4"
-		tcp6 = "tcp6"
-	)
-
-	if !(ntwrk == tcp4 || ntwrk == tcp6) {
+	switch ntwrk {
+	case "udp", "udp4", "udp6":
+	case "tcp", "tcp4", "tcp6":
+	default:
 		return ErrInvalidNetwork
 	}
-
-	// Separate the IP.
-	ip := ipport.Addr()
 
 	// Check if this IP is explicitly allowed.
 	for i := 0; i < len(s.Allow); i++ {
@@ -141,5 +139,31 @@ func SafeIP(ip netip.Addr) bool {
 	// Assume malicious by default
 	default:
 		return false
+	}
+}
+
+func dropPort(addr string) string {
+	i := strings.LastIndexByte(addr, ':')
+	if i < 0 {
+
+		// ipv4 w/o port
+		return addr
+	}
+
+	j := strings.LastIndexByte(addr, ']')
+	switch {
+
+	// ipv4 w/ port
+	case j < 0:
+		return addr[:i]
+
+	// ipv6 w/ port
+	// (remove braces)
+	case j < i:
+		return addr[1 : i-1]
+
+	// ipv6 w/o port
+	default:
+		return addr
 	}
 }
