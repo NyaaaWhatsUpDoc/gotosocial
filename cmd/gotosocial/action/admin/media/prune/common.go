@@ -77,15 +77,13 @@ func setupPrune(ctx context.Context) (*prune, error) {
 	}, nil
 }
 
-func (p *prune) shutdown() error {
-	errs := gtserror.NewMultiError(2)
-
-	if err := p.dbService.Close(); err != nil {
-		errs.Appendf("error stopping database: %w", err)
+func (p *prune) shutdown() (err error) {
+	if err = p.dbService.Close(); err != nil {
+		err = gtserror.Newf("error stopping db: %w", err)
 	}
 
 	p.state.Workers.Scheduler.Stop()
 	p.state.Caches.Stop()
 
-	return errs.Combine()
+	return err
 }
