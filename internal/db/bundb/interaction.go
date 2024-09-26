@@ -121,7 +121,7 @@ func (i *interactionDB) getInteractionRequest(
 func (i *interactionDB) PopulateInteractionRequest(ctx context.Context, req *gtsmodel.InteractionRequest) error {
 	var (
 		err  error
-		errs = gtserror.NewMultiError(4)
+		errs = make(gtserror.MultiError, 0, 4)
 	)
 
 	if req.Status == nil {

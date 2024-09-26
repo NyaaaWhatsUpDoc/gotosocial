@@ -74,7 +74,7 @@ func (r *relationshipDB) getNote(ctx context.Context, lookup string, dbQuery fun
 
 func (r *relationshipDB) PopulateNote(ctx context.Context, note *gtsmodel.AccountNote) error {
 	var (
-		errs = gtserror.NewMultiError(2)
+		errs = make(gtserror.MultiError, 0, 2)
 		err  error
 	)
 

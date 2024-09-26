@@ -91,7 +91,7 @@ func (suite *NotificationsTestSuite) getNotifications(
 		return nil, "", err
 	}
 
-	errs := gtserror.NewMultiError(2)
+	var errs gtserror.MultiError
 
 	// check code
 	if resultCode := recorder.Code; expectedHTTPStatus != resultCode {

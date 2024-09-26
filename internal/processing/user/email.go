@@ -42,8 +42,7 @@ func (p *Processor) EmailChange(
 ) (*apimodel.User, gtserror.WithCode) {
 	// Ensure provided password is correct.
 	if err := bcrypt.CompareHashAndPassword([]byte(user.EncryptedPassword), []byte(password)); err != nil {
-		err := gtserror.Newf("%w", err)
-		return nil, gtserror.NewErrorUnauthorized(err, "password was incorrect")
+		return nil, gtserror.NewErrorUnauthorized(gtserror.Wrap(err), "password was incorrect")
 	}
 
 	// Ensure new email address is valid.
@@ -55,14 +54,12 @@ func (p *Processor) EmailChange(
 	// from current email address.
 	if newEmail == user.Email {
 		const help = "new email address cannot be the same as current email address"
-		err := gtserror.New(help)
-		return nil, gtserror.NewErrorBadRequest(err, help)
+		return nil, gtserror.NewErrorBadRequest(errors.New(help), help)
 	}
 
 	if newEmail == user.UnconfirmedEmail {
 		const help = "you already have an email change request pending for given email address"
-		err := gtserror.New(help)
-		return nil, gtserror.NewErrorBadRequest(err, help)
+		return nil, gtserror.NewErrorBadRequest(errors.New(help), help)
 	}
 
 	// Ensure this address isn't already used by another account.

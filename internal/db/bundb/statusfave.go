@@ -209,7 +209,7 @@ func (s *statusFaveDB) getStatusFaveIDs(ctx context.Context, statusID string) ([
 func (s *statusFaveDB) PopulateStatusFave(ctx context.Context, statusFave *gtsmodel.StatusFave) error {
 	var (
 		err  error
-		errs = gtserror.NewMultiError(3)
+		errs = make(gtserror.MultiError, 0, 3)
 	)
 
 	if statusFave.Account == nil {

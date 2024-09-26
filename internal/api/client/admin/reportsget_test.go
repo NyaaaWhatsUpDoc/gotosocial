@@ -102,7 +102,7 @@ func (suite *ReportsGetTestSuite) getReports(
 		return nil, "", err
 	}
 
-	errs := gtserror.NewMultiError(2)
+	var errs gtserror.MultiError
 
 	if resultCode := recorder.Code; expectedHTTPStatus != resultCode {
 		errs.Appendf("expected %d got %d", expectedHTTPStatus, resultCode)

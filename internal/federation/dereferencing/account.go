@@ -341,7 +341,7 @@ func (d *Dereferencer) RefreshAccount(
 	)
 	if err != nil {
 		log.Errorf(ctx, "error enriching remote account: %v", err)
-		return nil, nil, gtserror.Newf("%w", err)
+		return nil, nil, gtserror.Wrap(err)
 	}
 
 	if accountable != nil {

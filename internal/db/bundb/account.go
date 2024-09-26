@@ -617,7 +617,7 @@ func (a *accountDB) getAccount(ctx context.Context, lookup string, dbQuery func(
 func (a *accountDB) PopulateAccount(ctx context.Context, account *gtsmodel.Account) error {
 	var (
 		err  error
-		errs = gtserror.NewMultiError(5)
+		errs = make(gtserror.MultiError, 0, 5)
 	)
 
 	if account.AvatarMediaAttachment == nil && account.AvatarMediaAttachmentID != "" {

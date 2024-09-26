@@ -62,7 +62,7 @@ func (suite *FiltersTestSuite) deleteFilterKeyword(
 		return err
 	}
 
-	errs := gtserror.NewMultiError(2)
+	var errs gtserror.MultiError
 
 	// check code + body
 	if resultCode := recorder.Code; expectedHTTPStatus != resultCode {

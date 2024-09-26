@@ -167,7 +167,7 @@ func (r *relationshipDB) getFollowRequest(ctx context.Context, lookup string, db
 func (r *relationshipDB) PopulateFollowRequest(ctx context.Context, follow *gtsmodel.FollowRequest) error {
 	var (
 		err  error
-		errs = gtserror.NewMultiError(2)
+		errs = make(gtserror.MultiError, 0, 2)
 	)
 
 	if follow.Account == nil {

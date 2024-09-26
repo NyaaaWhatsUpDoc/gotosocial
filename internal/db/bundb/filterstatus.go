@@ -125,7 +125,7 @@ func (f *filterDB) getFilterStatuses(ctx context.Context, idColumn string, id st
 	}
 
 	// Populate the filter statuses. Remove any that we can't populate from the return slice.
-	errs := gtserror.NewMultiError(len(filterStatuses))
+	errs := make(gtserror.MultiError, 0, len(filterStatuses))
 	filterStatuses = slices.DeleteFunc(filterStatuses, func(filterStatus *gtsmodel.FilterStatus) bool {
 		if err := f.populateFilterStatus(ctx, filterStatus); err != nil {
 			errs.Appendf(

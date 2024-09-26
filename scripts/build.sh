@@ -19,7 +19,6 @@ GO_GCFLAGS=${GO_GCFLAGS-}
 # - timetzdata:     embed timezone database inside binary                       (allow setting local time inside Docker containers, at cost of 450KB)
 # - notracing:      disables compiling-in otel tracing support                  (reduced binary size, better performance)
 # - nometrics:      disables compiling-in otel metrics support                  (reduced binary size, better performance)
-# - noerrcaller:    disables caller function prefix in errors                   (slightly better performance, at cost of err readability)
 # - debug:          enables /debug/pprof endpoint                               (adds debug, at performance cost)
 # - debugenv:       enables /debug/pprof endpoint if DEBUG=1 env during runtime (adds debug, at performance cost)
 # - moderncsqlite3: reverts to using the C-to-Go transpiled SQLite driver       (disables the WASM-based SQLite driver)

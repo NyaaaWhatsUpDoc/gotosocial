@@ -231,7 +231,7 @@ func (i *instanceDB) getInstance(ctx context.Context, lookup string, dbQuery fun
 func (i *instanceDB) PopulateInstance(ctx context.Context, instance *gtsmodel.Instance) error {
 	var (
 		err  error
-		errs = gtserror.NewMultiError(2)
+		errs = make(gtserror.MultiError, 0, 2)
 	)
 
 	if instance.DomainBlockID != "" && instance.DomainBlock == nil {

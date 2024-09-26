@@ -549,7 +549,7 @@ func (e *emojiDB) getEmoji(ctx context.Context, lookup string, dbQuery func(*gts
 
 func (e *emojiDB) PopulateEmoji(ctx context.Context, emoji *gtsmodel.Emoji) error {
 	var (
-		errs = gtserror.NewMultiError(1)
+		errs = make(gtserror.MultiError, 0, 1)
 		err  error
 	)
 

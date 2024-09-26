@@ -27,37 +27,24 @@ import (
 // errors, not return early / bubble up.
 type MultiError []error
 
-// NewMultiError returns a *MultiError with
-// the capacity of its underlying error slice
-// set to the provided value.
+// Append error wrapped by Wrap() to MultiError,
+// see Wrap() documentation for further details.
 //
-// This capacity can be exceeded if necessary,
-// but it saves a teeny tiny bit of memory if
-// callers set it correctly.
-//
-// If you don't know in advance what the capacity
-// must be, just use new(MultiError) instead.
-func NewMultiError(capacity int) MultiError {
-	return make([]error, 0, capacity)
-}
-
-// Append the given error to the MultiError.
+//go:noinline
 func (m *MultiError) Append(err error) {
-	(*m) = append((*m), err)
+	(*m) = append((*m), WrapAt(3, err))
 }
 
-// Append the given format string to the MultiError.
+// Appends error crafted by Newf() to MultiError.
+// See Newf() documentation for format details.
 //
-// It is valid to use %w in the format string
-// to wrap any other errors.
+//go:noinline
 func (m *MultiError) Appendf(format string, args ...any) {
-	err := newfAt(3, format, args...)
-	(*m) = append((*m), err)
+	(*m) = append((*m), NewfAt(3, format, args...))
 }
 
 // Combine the MultiError into a single error.
-//
-// Unwrap will work on the returned error as expected.
+// See errors.Join() for returned error behaviour.
 func (m MultiError) Combine() error {
 	return errors.Join(m...)
 }

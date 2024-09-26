@@ -89,7 +89,7 @@ func (p *Processor) accountActionSuspend(
 					Target:         targetAcct,
 				},
 			); err != nil {
-				errs := gtserror.NewMultiError(1)
+				errs := make(gtserror.MultiError, 0, 1)
 				errs.Append(err)
 				return errs
 			}

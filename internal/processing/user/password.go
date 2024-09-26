@@ -19,6 +19,7 @@ package user
 
 import (
 	"context"
+	"errors"
 
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
@@ -30,8 +31,7 @@ import (
 func (p *Processor) PasswordChange(ctx context.Context, user *gtsmodel.User, oldPassword string, newPassword string) gtserror.WithCode {
 	// Ensure provided oldPassword is the correct current password.
 	if err := bcrypt.CompareHashAndPassword([]byte(user.EncryptedPassword), []byte(oldPassword)); err != nil {
-		err := gtserror.Newf("%w", err)
-		return gtserror.NewErrorUnauthorized(err, "old password was incorrect")
+		return gtserror.NewErrorUnauthorized(gtserror.Wrap(err), "old password was incorrect")
 	}
 
 	// Ensure new password is strong enough.
@@ -42,8 +42,7 @@ func (p *Processor) PasswordChange(ctx context.Context, user *gtsmodel.User, old
 	// Ensure new password is different from old password.
 	if newPassword == oldPassword {
 		const help = "new password cannot be the same as previous password"
-		err := gtserror.New(help)
-		return gtserror.NewErrorBadRequest(err, help)
+		return gtserror.NewErrorBadRequest(errors.New(help), help)
 	}
 
 	// Hash the new password.
@@ -52,7 +51,7 @@ func (p *Processor) PasswordChange(ctx context.Context, user *gtsmodel.User, old
 		bcrypt.DefaultCost,
 	)
 	if err != nil {
-		err := gtserror.Newf("%w", err)
+		err := gtserror.Newf("error generating bcrypt hash: %w", err)
 		return gtserror.NewErrorInternalError(err)
 	}
 

@@ -181,7 +181,7 @@ func (s *statusDB) getStatus(ctx context.Context, lookup string, dbQuery func(*g
 func (s *statusDB) PopulateStatus(ctx context.Context, status *gtsmodel.Status) error {
 	var (
 		err  error
-		errs = gtserror.NewMultiError(9)
+		errs = make(gtserror.MultiError, 0, 9)
 	)
 
 	if status.Account == nil {

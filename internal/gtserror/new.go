@@ -18,47 +18,128 @@
 package gtserror
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
+
+	"github.com/superseriousbusiness/gotosocial/internal/log"
 )
 
-// New returns a new error, prepended with caller
-// function name if gtserror.Caller is enabled.
+// New returns a new error,
+// prepended with calling function. It
+// functions similarly to errors.New().
+//
+//go:noinline
 func New(msg string) error {
-	return newAt(3, msg)
+	return &cerror{
+		c: log.Caller(3),
+		e: errors.New(msg),
+	}
 }
 
-// Newf returns a new formatted error, prepended with
-// caller function name if gtserror.Caller is enabled.
+// Newf returns a new formatted error,
+// prepended with calling function. It
+// functions similarly to fmt.Errorf().
+//
+//go:noinline
 func Newf(msgf string, args ...any) error {
-	return newfAt(3, msgf, args...)
+	return &cerror{
+		c: log.Caller(3),
+		e: fmt.Errorf(msgf, args...),
+	}
 }
 
-// NewfAt returns a new formatted error with the given
-// calldepth+1, useful when you want to wrap an error
-// from within an anonymous function or utility function,
-// but preserve the name in the error of the wrapping
-// function that did the calling.
+// NewAt returns a new error,
+// prepended with calling function. It
+// functions similarly to errors.New().
 //
-// Provide calldepth 2 to prepend only the name of the
-// current containing function, 3 to prepend the name
-// of the function containing *that* function, and so on.
+// Calldepth allows you to specify how many
+// function frames to skip in determining
+// calling function name. You should manually
+// check this returns expected function name
+// before deploy, this very much depends on
+// how the inliner behaves during compilation.
+// Generally a value of 3 is a good start.
 //
-// This function is just exposed for dry-dick optimization
-// purposes. Most callers should just call Newf instead.
+// See runtime.Callers() and runtime.FuncForPC()
+// for more information on calldepth usage.
+//
+//go:noinline
+func NewAt(calldepth int, msg string) error {
+	return &cerror{
+		c: log.Caller(calldepth + 1),
+		e: errors.New(msg),
+	}
+}
+
+// NewfAt returns a new formatted error,
+// prepended with calling function. It
+// functions similarly to fmt.Errorf().
+//
+// Calldepth allows you to specify how many
+// function frames to skip in determining
+// calling function name. You should manually
+// check this returns expected function name
+// before deploy, this very much depends on
+// how the inliner behaves during compilation.
+// Generally a value of 3 is a good start.
+//
+// See runtime.Callers() and runtime.FuncForPC()
+// for more information on calldepth usage.
+//
+//go:noinline
 func NewfAt(calldepth int, msgf string, args ...any) error {
-	return newfAt(calldepth+1, msgf, args...)
+	return &cerror{
+		c: log.Caller(calldepth + 1),
+		e: fmt.Errorf(msgf, args...),
+	}
+}
+
+// Wrap returns a new wrapped error,
+// prepended with calling function.
+//
+//go:noinline
+func Wrap(err error) error {
+	return &cerror{
+		c: log.Caller(3),
+		e: err,
+	}
+}
+
+// WrapAt returns a new wrapped error,
+// prepended with calling function.
+//
+// Calldepth allows you to specify how many
+// function frames to skip in determining
+// calling function name. You should manually
+// check this returns expected function name
+// before deploy, this very much depends on
+// how the inliner behaves during compilation.
+// Generally a value of 3 is a good start.
+//
+// See runtime.Callers() and runtime.FuncForPC()
+// for more information on calldepth usage.
+//
+//go:noinline
+func WrapAt(calldepth int, err error) error {
+	return &cerror{
+		c: log.Caller(calldepth + 1),
+		e: err,
+	}
 }
 
 // NewResponseError crafts an error from provided HTTP response
 // including the method, status and body (if any provided). This
 // will also wrap the returned error using WithStatusCode() and
 // will include the caller function name as a prefix.
+//
+//go:noinline
 func NewFromResponse(rsp *http.Response) error {
 	// Build error with message without
 	// using "fmt", as chances are this will
 	// be used in a hot code path and we
 	// know all the incoming types involved.
-	err := newAt(3, ""+
+	err := NewAt(3, ""+
 		rsp.Request.Method+
 		" request to "+
 		rsp.Request.URL.String()+
@@ -71,4 +152,20 @@ func NewFromResponse(rsp *http.Response) error {
 
 	// Wrap error to provide status code.
 	return WithStatusCode(err, rsp.StatusCode)
+}
+
+// cerror wraps an error with a string
+// prefix of the caller function name.
+type cerror struct {
+	c string
+	e error
+}
+
+func (ce *cerror) Error() string {
+	msg := ce.e.Error()
+	return ce.c + ": " + msg
+}
+
+func (ce *cerror) Unwrap() error {
+	return ce.e
 }

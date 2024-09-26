@@ -55,12 +55,7 @@ func testResponseError(t *testing.T, rsp http.Response) {
 	}
 	expect := fmt.Sprintf(
 		"%s%s request to %s failed: status=\"%s\" body=\"%s\"",
-		func() string {
-			if gtserror.Caller {
-				return strings.Split(log.Caller(3), ".")[1] + ": "
-			}
-			return ""
-		}(),
+		strings.Split(log.Caller(3), ".")[1]+": ",
 		rsp.Request.Method,
 		rsp.Request.URL.String(),
 		rsp.Status,

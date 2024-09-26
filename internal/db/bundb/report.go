@@ -177,7 +177,7 @@ func (r *reportDB) getReport(ctx context.Context, lookup string, dbQuery func(*g
 func (r *reportDB) PopulateReport(ctx context.Context, report *gtsmodel.Report) error {
 	var (
 		err  error
-		errs = gtserror.NewMultiError(4)
+		errs = make(gtserror.MultiError, 0, 4)
 	)
 
 	if report.Account == nil {

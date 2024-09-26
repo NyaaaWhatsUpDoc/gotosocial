@@ -98,7 +98,7 @@ func (suite *AccountSearchTestSuite) getSearch(
 		suite.FailNow(err.Error())
 	}
 
-	errs := gtserror.NewMultiError(2)
+	var errs gtserror.MultiError
 
 	// Check expected code + body.
 	if resultCode := recorder.Code; expectedHTTPStatus != resultCode {

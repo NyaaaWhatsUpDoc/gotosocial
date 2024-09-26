@@ -126,7 +126,7 @@ func (p *Processor) domainAllowSideEffects(
 	// So, check if there's a block.
 	block, err := p.state.DB.GetDomainBlock(ctx, allow.Domain)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
-		errs := gtserror.NewMultiError(1)
+		errs := make(gtserror.MultiError, 0, 1)
 		errs.Appendf("db error getting domain block %s: %w", allow.Domain, err)
 		return errs
 	}
@@ -230,7 +230,7 @@ func (p *Processor) domainUnallowSideEffects(
 	// So, check if there's a block.
 	block, err := p.state.DB.GetDomainBlock(ctx, allow.Domain)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
-		errs := gtserror.NewMultiError(1)
+		errs := make(gtserror.MultiError, 0, 1)
 		errs.Appendf("db error getting domain block %s: %w", allow.Domain, err)
 		return errs
 	}

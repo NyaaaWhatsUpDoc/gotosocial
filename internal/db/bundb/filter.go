@@ -106,7 +106,7 @@ func (f *filterDB) GetFiltersForAccountID(ctx context.Context, accountID string)
 	}
 
 	// Populate the filters. Remove any that we can't populate from the return slice.
-	errs := gtserror.NewMultiError(len(filters))
+	errs := make(gtserror.MultiError, 0, len(filters))
 	filters = slices.DeleteFunc(filters, func(filter *gtsmodel.Filter) bool {
 		if err := f.populateFilter(ctx, filter); err != nil {
 			errs.Appendf("error populating filter %s: %w", filter.ID, err)
@@ -120,7 +120,7 @@ func (f *filterDB) GetFiltersForAccountID(ctx context.Context, accountID string)
 
 func (f *filterDB) populateFilter(ctx context.Context, filter *gtsmodel.Filter) error {
 	var err error
-	errs := gtserror.NewMultiError(2)
+	errs := make(gtserror.MultiError, 0, 2)
 
 	if filter.Keywords == nil {
 		// Filter keywords are not set, fetch from the database.

@@ -67,7 +67,7 @@ func (suite *StatusUnpinTestSuite) createUnpin(
 		return nil, err
 	}
 
-	errs := gtserror.NewMultiError(2)
+	var errs gtserror.MultiError
 
 	// Check expected code + body.
 	if resultCode := recorder.Code; expectedHTTPStatus != resultCode {

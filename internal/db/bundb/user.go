@@ -143,7 +143,7 @@ func (u *userDB) getUser(ctx context.Context, lookup string, dbQuery func(*gtsmo
 // PopulateUser ensures that the user's struct fields are populated.
 func (u *userDB) PopulateUser(ctx context.Context, user *gtsmodel.User) error {
 	var (
-		errs = gtserror.NewMultiError(1)
+		errs = make(gtserror.MultiError, 0, 1)
 		err  error
 	)
 
