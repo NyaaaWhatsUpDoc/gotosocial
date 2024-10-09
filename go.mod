@@ -4,6 +4,8 @@ go 1.22.2
 
 replace modernc.org/sqlite => gitlab.com/NyaaaWhatsUpDoc/sqlite v1.33.1-concurrency-workaround
 
+replace github.com/ncruces/go-sqlite3 => ../go-sqlite3
+
 require (
 	codeberg.org/gruf/go-bytes v1.0.2
 	codeberg.org/gruf/go-bytesize v1.0.3

@@ -145,6 +145,12 @@ func NewBunDBService(ctx context.Context, state *state.State) (db.DB, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		log.Info(ctx, "running analyze...")
+		_, err = db.ExecContext(ctx, "ANALYZE")
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("database type %s not supported for bundb", t)
 	}
