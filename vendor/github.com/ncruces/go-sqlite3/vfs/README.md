@@ -4,7 +4,7 @@ This package implements the SQLite [OS Interface](https://sqlite.org/vfs.html) (
 
 It replaces the default SQLite VFS with a **pure Go** implementation,
 and exposes [interfaces](https://pkg.go.dev/github.com/ncruces/go-sqlite3/vfs#VFS)
-that should allow you to implement your own custom VFSes.
+that should allow you to implement your own [custom VFSes](#custom-vfses).
 
 Since it is a from scratch reimplementation,
 there are naturally some ways it deviates from the original.
@@ -46,18 +46,14 @@ to check if your build supports file locking.
 
 ### Write-Ahead Logging
 
-On 64-bit little-endian Unix, this module uses `mmap` to implement
+On little-endian Unix, this module uses `mmap` to implement
 [shared-memory for the WAL-index](https://sqlite.org/wal.html#implementation_of_shared_memory_for_the_wal_index),
 like SQLite.
-
-To allow `mmap` to work, each connection needs to reserve up to 4GB of address space.
-To limit the address space each connection reserves,
-use [`WithMemoryLimitPages`](../tests/testcfg/testcfg.go).
 
 With [BSD locks](https://man.freebsd.org/cgi/man.cgi?query=flock&sektion=2)
 a WAL database can only be accessed by a single proccess.
 Other processes that attempt to access a database locked with BSD locks,
-will fail with the `SQLITE_PROTOCOL` error code.
+will fail with the [`SQLITE_PROTOCOL`](https://sqlite.org/rescode.html#protocol) error code.
 
 Otherwise, [WAL support is limited](https://sqlite.org/wal.html#noshm),
 and `EXCLUSIVE` locking mode must be set to create, read, and write WAL databases.
@@ -90,3 +86,14 @@ The VFS can be customized with a few build tags:
 > [`unix-flock` VFS](https://sqlite.org/compile.html#enable_locking_style).
 > If incompatible file locking is used, accessing databases concurrently with
 > _other_ SQLite libraries will eventually corrupt data.
+
+### Custom VFSes
+
+- [`github.com/ncruces/go-sqlite3/vfs/adiantum`](https://pkg.go.dev/github.com/ncruces/go-sqlite3/vfs/adiantum)
+  wraps a VFS to offer encryption at rest.
+- [`github.com/ncruces/go-sqlite3/vfs/memdb`](https://pkg.go.dev/github.com/ncruces/go-sqlite3/vfs/memdb)
+  implements an in-memory VFS.
+- [`github.com/ncruces/go-sqlite3/vfs/readervfs`](https://pkg.go.dev/github.com/ncruces/go-sqlite3/vfs/readervfs)
+  implements a VFS for immutable databases.
+- [`github.com/ncruces/go-sqlite3/vfs/xts`](https://pkg.go.dev/github.com/ncruces/go-sqlite3/vfs/xts)
+  wraps a VFS to offer encryption at rest.

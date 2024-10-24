@@ -526,6 +526,7 @@ github.com/ncruces/go-sqlite3/embed
 github.com/ncruces/go-sqlite3/internal/alloc
 github.com/ncruces/go-sqlite3/internal/util
 github.com/ncruces/go-sqlite3/util/osutil
+github.com/ncruces/go-sqlite3/util/sql3util
 github.com/ncruces/go-sqlite3/vfs
 github.com/ncruces/go-sqlite3/vfs/memdb
 # github.com/ncruces/go-strftime v0.1.9
