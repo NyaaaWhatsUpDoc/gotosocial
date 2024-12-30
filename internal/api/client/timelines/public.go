@@ -25,6 +25,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/config"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // PublicTimelineGETHandler swagger:operation GET /api/v1/timelines/public publicTimeline
@@ -136,7 +137,11 @@ func (m *Module) PublicTimelineGETHandler(c *gin.Context) {
 		return
 	}
 
-	limit, errWithCode := apiutil.ParseLimit(c.Query(apiutil.LimitKey), 20, 40, 1)
+	page, errWithCode := paging.ParseIDPage(c,
+		1,  // min limit
+		40, // max limit
+		20, // default limit
+	)
 	if errWithCode != nil {
 		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
 		return
@@ -151,10 +156,7 @@ func (m *Module) PublicTimelineGETHandler(c *gin.Context) {
 	resp, errWithCode := m.processor.Timeline().PublicTimelineGet(
 		c.Request.Context(),
 		authed.Account,
-		c.Query(apiutil.MaxIDKey),
-		c.Query(apiutil.SinceIDKey),
-		c.Query(apiutil.MinIDKey),
-		limit,
+		page,
 		local,
 	)
 	if errWithCode != nil {

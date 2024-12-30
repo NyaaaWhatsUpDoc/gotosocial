@@ -1379,7 +1379,7 @@ func (c *Caches) initStatus() {
 		},
 		MaxSize:    cap,
 		IgnoreErr:  ignoreErrors,
-		Copy:       copyF,
+		Copy:       copyStatus,
 		Invalidate: c.OnInvalidateStatus,
 	})
 }

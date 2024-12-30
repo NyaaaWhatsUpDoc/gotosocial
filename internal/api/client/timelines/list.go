@@ -24,6 +24,7 @@ import (
 	apiutil "github.com/superseriousbusiness/gotosocial/internal/api/util"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/oauth"
+	"github.com/superseriousbusiness/gotosocial/internal/paging"
 )
 
 // ListTimelineGETHandler swagger:operation GET /api/v1/timelines/list/{id} listTimeline
@@ -129,7 +130,11 @@ func (m *Module) ListTimelineGETHandler(c *gin.Context) {
 		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
 	}
 
-	limit, errWithCode := apiutil.ParseLimit(c.Query(apiutil.LimitKey), 20, 40, 1)
+	page, errWithCode := paging.ParseIDPage(c,
+		1,  // min limit
+		40, // max limit
+		20, // default limit
+	)
 	if errWithCode != nil {
 		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
 		return
@@ -137,12 +142,9 @@ func (m *Module) ListTimelineGETHandler(c *gin.Context) {
 
 	resp, errWithCode := m.processor.Timeline().ListTimelineGet(
 		c.Request.Context(),
-		authed,
+		authed.Account,
 		targetListID,
-		c.Query(apiutil.MaxIDKey),
-		c.Query(apiutil.SinceIDKey),
-		c.Query(apiutil.MinIDKey),
-		limit,
+		page,
 	)
 	if errWithCode != nil {
 		apiutil.ErrorHandler(c, errWithCode, m.processor.InstanceGetV1)
