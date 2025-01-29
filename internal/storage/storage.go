@@ -18,6 +18,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -74,6 +75,9 @@ func IsNotFound(err error) bool {
 type Driver struct {
 	// Underlying storage
 	Storage storage.Storage
+
+	// Disk-only parameters
+	CacheDirTag string
 
 	// S3-only parameters
 	Proxy          bool
@@ -153,13 +157,66 @@ func (d *Driver) Has(ctx context.Context, key string) (bool, error) {
 	return (stat != nil), err
 }
 
-// WalkKeys walks the keys in the storage.
+// WalkKeys walks the keys in the storage with the given walk function.
 func (d *Driver) WalkKeys(ctx context.Context, walk func(string) error) error {
 	return d.Storage.WalkKeys(ctx, storage.WalkKeysOpts{
 		Step: func(entry storage.Entry) error {
 			return walk(entry.Key)
 		},
 	})
+}
+
+// AddCacheDirTag marks the given directory as a cache, by placing a CACHEDIR.TAG file.
+func (d *Driver) AddCacheDirTag(ctx context.Context, dir string) error {
+
+	// We don't support setting CACHEDIR.TAG
+	// for other implementations as we can't
+	// use hard-linking preserve storage space.
+	switch dd := d.Storage.(type) {
+	case *disk.DiskStorage:
+
+		// Determine on-disk file-path of CACHEDIR.TAG
+		// in order to hard-link back to the original.
+		path, err := dd.Filepath(dir + "/CACHEDIR.TAG")
+		if err != nil {
+			return gtserror.Newf("error building CACHEDIR.TAG path: %w", err)
+		}
+
+		// Hard-link the original CACHEDIR.TAG to new path.
+		if err := os.Link(d.CacheDirTag, path); err != nil {
+			return gtserror.Newf("error hard-linking %s -> %s: %w", d.CacheDirTag, path, err)
+		}
+
+		return nil
+	default:
+		return nil
+	}
+}
+
+// DelCacheDirTag deletes any CACHEDIR.TAG marking the directory as a cache.
+func (d *Driver) DelCacheDirTag(ctx context.Context, dir string) error {
+
+	// We don't support setting CACHEDIR.TAG
+	// for other implementations as we can't
+	// use hard-linking preserve storage space.
+	switch dd := d.Storage.(type) {
+	case *disk.DiskStorage:
+
+		// Determine on-disk file-path of CACHEDIR.TAG.
+		path, err := dd.Filepath(dir + "/CACHEDIR.TAG")
+		if err != nil {
+			return gtserror.Newf("error building CACHEDIR.TAG path: %w", err)
+		}
+
+		// Remove the CACHEDIR.TAG hard-link, don't care if not exists.
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return gtserror.Newf("error removing %s: %w", path, err)
+		}
+
+		return nil
+	default:
+		return nil
+	}
 }
 
 // URL will return a presigned GET object URL, but only if running on S3 storage with proxying disabled.
@@ -275,18 +332,18 @@ func (d *Driver) ProbeCSPUri(ctx context.Context) (string, error) {
 	return uStripped.String(), nil
 }
 
-func AutoConfig() (*Driver, error) {
+func AutoConfig(ctx context.Context) (*Driver, error) {
 	switch backend := config.GetStorageBackend(); backend {
 	case "s3":
 		return NewS3Storage()
 	case "local":
-		return NewFileStorage()
+		return NewFileStorage(ctx)
 	default:
 		return nil, fmt.Errorf("invalid storage backend: %s", backend)
 	}
 }
 
-func NewFileStorage() (*Driver, error) {
+func NewFileStorage(ctx context.Context) (*Driver, error) {
 	// Load runtime configuration
 	basePath := config.GetStorageLocalBasePath()
 
@@ -301,9 +358,37 @@ func NewFileStorage() (*Driver, error) {
 		return nil, fmt.Errorf("error opening disk storage: %w", err)
 	}
 
-	return &Driver{
-		Storage: disk,
-	}, nil
+	var d Driver
+	d.Storage = disk
+
+	// In the root ensure CACHEDIR.TAG source file exists,
+	// though we name it differently so it doesn't just mark
+	// the entire storage sub-tree as a non-backup-able.
+	// All further directories that are remote caches, and
+	// not local storage can then hard-link from the source.
+	//
+	// For more information see: https://bford.info/cachedir/
+	if stat, _ := disk.Stat(ctx, "/CACHEDIR.TAG.original"); stat == nil {
+		var buf bytes.Buffer
+		buf.WriteString("Signature: 8a477f597d28d172789f06886806bc55\n")
+		buf.WriteString("#\n")
+		buf.WriteString("# PLEASE DO NOT MODIFY THE FIRST LINE!\n")
+		buf.WriteString("# This file is a cache directory tag created by GoToSocial.\n")
+		buf.WriteString("# For information about cache directory tags, see:\n")
+		buf.WriteString("# http://www.brynosaurus.com/cachedir/\n")
+		_, err = disk.WriteStream(ctx, "/CACHEDIR.TAG.original", &buf)
+		if err != nil {
+			return nil, fmt.Errorf("error writing CACHEDIR.TAG source: %w", err)
+		}
+
+		// Determine on-disk filepath of the CACHEDIR.TAG source file.
+		d.CacheDirTag, err = disk.Filepath("/CACHEDIR.TAG.original")
+		if err != nil {
+			return nil, fmt.Errorf("error getting CACHEDIR.TAG source path: %w", err)
+		}
+	}
+
+	return &d, nil
 }
 
 func NewS3Storage() (*Driver, error) {

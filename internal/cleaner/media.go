@@ -582,6 +582,14 @@ func (m *Media) delete(ctx context.Context, media *gtsmodel.MediaAttachment) err
 		return gtserror.Newf("error removing media files: %w", err)
 	}
 
+	if media.IsRemote() {
+
+		err := m.state.Storage.DelCacheDirTag(ctx, "")
+		if err != nil {
+			log.Errorf(ctx, "error deleting cache dir tag: %v", err)
+		}
+	}
+
 	// Delete media attachment entirely from the database.
 	log.Debugf(ctx, "deleting media attachment: %s", media.ID)
 	if err := m.state.DB.DeleteAttachment(ctx, media.ID); err != nil {
