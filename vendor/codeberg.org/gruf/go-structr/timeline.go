@@ -516,6 +516,26 @@ func (t *Timeline[T, PK]) RangeKeysUnsafe(index *Index, keys ...Key) func(yield 
 	}
 }
 
+func (t *Timeline[T, PK]) Contains(index *Index, fn func(func(Key) bool)) {
+	if index == nil {
+		panic("no index given")
+	} else if index.ptr != unsafe.Pointer(t) {
+		panic("invalid index for timeline")
+	} else if fn == nil {
+		panic("nil func")
+	}
+
+	// Acquire lock.
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+
+	// Execute given func.
+	fn(func(k Key) bool {
+		_, ok := index.data.m[k.key]
+		return ok
+	})
+}
+
 // Trim will remove entries from the timeline in given
 // direction, ensuring timeline is no larger than 'max'.
 // If 'max' >= t.Len(), this function is a no-op.
