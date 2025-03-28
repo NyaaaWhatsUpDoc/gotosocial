@@ -60,7 +60,7 @@ codeberg.org/gruf/go-storage/disk
 codeberg.org/gruf/go-storage/internal
 codeberg.org/gruf/go-storage/memory
 codeberg.org/gruf/go-storage/s3
-# codeberg.org/gruf/go-structr v0.9.3
+# codeberg.org/gruf/go-structr v0.9.3 => ../go-structr
 ## explicit; go 1.22
 codeberg.org/gruf/go-structr
 # codeberg.org/superseriousbusiness/activity v1.13.0-gts
@@ -1319,5 +1319,6 @@ modernc.org/sqlite/lib
 # mvdan.cc/xurls/v2 v2.6.0
 ## explicit; go 1.22.0
 mvdan.cc/xurls/v2
+# codeberg.org/gruf/go-structr => ../go-structr
 # github.com/go-swagger/go-swagger => codeberg.org/superseriousbusiness/go-swagger v0.31.0-gts-go1.23-fix
 # modernc.org/sqlite => gitlab.com/NyaaaWhatsUpDoc/sqlite v1.36.2-concurrency-workaround
