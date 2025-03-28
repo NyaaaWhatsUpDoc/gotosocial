@@ -522,7 +522,7 @@ func (t *StatusTimeline) Load(
 
 // InsertOne allows you to insert a single status into the timeline, with optional prepared API model.
 func (t *StatusTimeline) InsertOne(status *gtsmodel.Status, prepared *apimodel.Status) {
-	t.insert(&StatusMeta{
+	t.insertOne(&StatusMeta{
 		ID:               status.ID,
 		AccountID:        status.AccountID,
 		BoostOfID:        status.BoostOfID,
@@ -536,6 +536,20 @@ func (t *StatusTimeline) InsertOne(status *gtsmodel.Status, prepared *apimodel.S
 // Insert allows you to bulk insert many statuses into the timeline.
 func (t *StatusTimeline) Insert(statuses ...*gtsmodel.Status) {
 	t.insert(toStatusMeta(statuses)...)
+}
+
+func (t *StatusTimeline) insertOne(meta *StatusMeta) {
+	var ok bool
+
+	// Check whether incoming status meta is a boost already seen.
+	t.cache.Contains(t.idx_BoostOfID, func(fn func(structr.Key) bool) {
+		ok = fn(t.idx_BoostOfID.Key(meta.BoostOfID))
+	})
+
+	if !ok {
+		// Insert status meta.
+		t.cache.Insert(meta)
+	}
 }
 
 // insert will insert the given meta into timeline cache.
