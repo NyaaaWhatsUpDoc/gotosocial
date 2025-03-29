@@ -514,7 +514,7 @@ func (t *StatusTimeline) Load(
 	if len(justLoaded) > 0 {
 		// Even if we don't return them, insert
 		// the excess (post-filtered) into cache.
-		t.insert(justLoaded...)
+		t.cache.Insert(justLoaded...)
 	}
 
 	return apiStatuses, lo, hi, nil
@@ -522,7 +522,7 @@ func (t *StatusTimeline) Load(
 
 // InsertOne allows you to insert a single status into the timeline, with optional prepared API model.
 func (t *StatusTimeline) InsertOne(status *gtsmodel.Status, prepared *apimodel.Status) {
-	t.insertOne(&StatusMeta{
+	t.cache.Insert(&StatusMeta{
 		ID:               status.ID,
 		AccountID:        status.AccountID,
 		BoostOfID:        status.BoostOfID,
@@ -535,35 +535,7 @@ func (t *StatusTimeline) InsertOne(status *gtsmodel.Status, prepared *apimodel.S
 
 // Insert allows you to bulk insert many statuses into the timeline.
 func (t *StatusTimeline) Insert(statuses ...*gtsmodel.Status) {
-	t.insert(toStatusMeta(statuses)...)
-}
-
-func (t *StatusTimeline) insertOne(meta *StatusMeta) {
-	var ok bool
-
-	// Check whether incoming status meta is a boost already seen.
-	t.cache.Contains(t.idx_BoostOfID, func(fn func(structr.Key) bool) {
-		ok = fn(t.idx_BoostOfID.Key(meta.BoostOfID))
-	})
-
-	if !ok {
-		// Insert status meta.
-		t.cache.Insert(meta)
-	}
-}
-
-// insert will insert the given meta into timeline cache.
-func (t *StatusTimeline) insert(metas ...*StatusMeta) {
-
-	// Filter the incoming status meta by whether we've already seen boost.
-	t.cache.Contains(t.idx_BoostOfID, func(fn func(key structr.Key) bool) {
-		metas = slices.DeleteFunc(metas, func(m *StatusMeta) bool {
-			return fn(t.idx_BoostOfID.Key(m.BoostOfID))
-		})
-	})
-
-	// Insert remaining meta.
-	t.cache.Insert(metas...)
+	t.cache.Insert(toStatusMeta(statuses)...)
 }
 
 // RemoveByStatusID removes all cached timeline entries pertaining to
