@@ -274,7 +274,7 @@ func (t *StatusTimeline) Init(cap int) {
 			// ID as primary key is inherently an index.
 			// {Fields: "ID"},
 			{Fields: "AccountID", Multiple: true},
-			{Fields: "BoostOfID", Multiple: true},
+			{Fields: "BoostOfID", Multiple: false},
 			{Fields: "BoostOfAccountID", Multiple: true},
 		},
 
