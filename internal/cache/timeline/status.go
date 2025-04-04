@@ -22,12 +22,14 @@ import (
 	"maps"
 	"slices"
 	"sync/atomic"
+	"time"
 
 	"codeberg.org/gruf/go-structr"
 
 	apimodel "github.com/superseriousbusiness/gotosocial/internal/api/model"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
+	"github.com/superseriousbusiness/gotosocial/internal/id"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
 	"github.com/superseriousbusiness/gotosocial/internal/paging"
 	"github.com/superseriousbusiness/gotosocial/internal/util"
@@ -651,8 +653,49 @@ func LoadStatusTimeline(
 	return apiStatuses, lo, hi, nil
 }
 
-// InsertOne allows you to insert a single status into the timeline, with optional prepared API model.
-func (t *StatusTimeline) InsertOne(status *gtsmodel.Status, prepared *apimodel.Status) {
+// StreamedInsert allows you to attempt to insert a single status into the timeline, with optional prepared API model.
+// Returned boolean indicates whether status was actually inserted into the cache, i.e. whether it should be streamed.
+func (t *StatusTimeline) StreamedInsert(status *gtsmodel.Status, prepared *apimodel.Status) bool {
+
+	// Items that weren't
+	// prepare aren't shown.
+	if prepared == nil {
+		return false
+	}
+
+	// Check if this is a boost wrapper of some status.
+	if boostOfID := status.BoostOfID; boostOfID != "" {
+		const falloff = 5 * time.Minute
+
+		// Get the creation date of boost wrapper.
+		boostedAt, _ := id.TimeFromULID(status.ID)
+
+		// Calculate creation date of original status.
+		originalAt, _ := id.TimeFromULID(boostOfID)
+
+		// Don't show if very soon after original.
+		if boostedAt.Sub(originalAt) < falloff {
+			return false
+		}
+
+		// Generate index key for boosted ID.
+		key := t.idx_BoostOfID.Key(boostOfID)
+
+		// Determine how many items are also a boost of status, and
+		// check whether any boosts have occurred in the last X falloff.
+		for meta := range t.cache.RangeKeysUnsafe(t.idx_BoostOfID, key) {
+			otherAt, _ := id.TimeFromULID(meta.ID)
+			diff := boostedAt.Sub(otherAt)
+			if diff < 0 {
+				diff *= -1
+			}
+			if diff < falloff {
+				return false
+			}
+		}
+	}
+
+	// Insert item into timeline.
 	t.cache.Insert(&StatusMeta{
 		ID:               status.ID,
 		AccountID:        status.AccountID,
@@ -662,11 +705,8 @@ func (t *StatusTimeline) InsertOne(status *gtsmodel.Status, prepared *apimodel.S
 		loaded:           status,
 		prepared:         prepared,
 	})
-}
 
-// Insert allows you to bulk insert many statuses into the timeline.
-func (t *StatusTimeline) Insert(statuses ...*gtsmodel.Status) {
-	t.cache.Insert(toStatusMeta(statuses)...)
+	return true
 }
 
 // RemoveByStatusID removes all cached timeline entries pertaining to

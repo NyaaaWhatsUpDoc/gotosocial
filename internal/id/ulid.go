@@ -89,6 +89,5 @@ func TimeFromULID(id string) (time.Time, error) {
 	if err != nil {
 		return time.Time{}, err
 	}
-
 	return ulid.Time(parsed.Time()), nil
 }

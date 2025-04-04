@@ -382,11 +382,10 @@ func (s *Surface) timelineStatus(
 		log.Error(ctx, "error converting status %s to frontend: %v", status.URI, err)
 	}
 
-	// Insert status to timeline cache regardless of
-	// if API model was successfully prepared or not.
-	timeline.InsertOne(status, apiModel)
+	// Attempt to insert status with API model into
+	// timeline cache, determining whether to stream it.
+	if timeline.StreamedInsert(status, apiModel) {
 
-	if apiModel != nil {
 		// Only send the status to user's stream if not
 		// filtered / muted, i.e. successfully prepared model.
 		s.Stream.Update(ctx, account, apiModel, streamType)
