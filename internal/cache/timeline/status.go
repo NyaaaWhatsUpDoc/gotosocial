@@ -667,8 +667,8 @@ func (t *StatusTimeline) StreamedInsert(status *gtsmodel.Status, prepared *apimo
 	if boostOfID := status.BoostOfID; boostOfID != "" {
 		const falloff = 5 * time.Minute
 
-		// Get the creation date of boost wrapper.
-		boostedAt, _ := id.TimeFromULID(status.ID)
+		// Get creation of boost wrapper.
+		boostedAt := status.CreatedAt
 
 		// Calculate creation date of original status.
 		originalAt, _ := id.TimeFromULID(boostOfID)
