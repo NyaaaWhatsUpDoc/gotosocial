@@ -19,6 +19,7 @@ package common
 
 import (
 	"github.com/superseriousbusiness/gotosocial/internal/federation"
+	"github.com/superseriousbusiness/gotosocial/internal/filter/mutes"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/visibility"
 	"github.com/superseriousbusiness/gotosocial/internal/media"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
@@ -29,11 +30,12 @@ import (
 // common to multiple logical domains of the
 // processing subsection of the codebase.
 type Processor struct {
-	state     *state.State
-	media     *media.Manager
-	converter *typeutils.Converter
-	federator *federation.Federator
-	visFilter *visibility.Filter
+	state      *state.State
+	media      *media.Manager
+	converter  *typeutils.Converter
+	federator  *federation.Federator
+	visFilter  *visibility.Filter
+	muteFilter *mutes.Filter
 }
 
 // New returns a new Processor instance.

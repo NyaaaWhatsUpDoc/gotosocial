@@ -26,8 +26,8 @@ import (
 	apimodel "github.com/superseriousbusiness/gotosocial/internal/api/model"
 	timelinepkg "github.com/superseriousbusiness/gotosocial/internal/cache/timeline"
 	"github.com/superseriousbusiness/gotosocial/internal/db"
+	"github.com/superseriousbusiness/gotosocial/internal/filter/mutes"
 	statusfilter "github.com/superseriousbusiness/gotosocial/internal/filter/status"
-	"github.com/superseriousbusiness/gotosocial/internal/filter/usermute"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/visibility"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
@@ -48,9 +48,10 @@ var (
 )
 
 type Processor struct {
-	state     *state.State
-	converter *typeutils.Converter
-	visFilter *visibility.Filter
+	state      *state.State
+	converter  *typeutils.Converter
+	visFilter  *visibility.Filter
+	muteFilter *mutes.Filter
 }
 
 func New(state *state.State, converter *typeutils.Converter, visFilter *visibility.Filter) Processor {
@@ -77,7 +78,6 @@ func (p *Processor) getStatusTimeline(
 ) {
 	var err error
 	var filters []*gtsmodel.Filter
-	var mutes *usermute.CompiledUserMuteList
 
 	if requester != nil {
 		// Fetch all filters relevant for requesting account.
@@ -88,19 +88,6 @@ func (p *Processor) getStatusTimeline(
 			err := gtserror.Newf("error getting account filters: %w", err)
 			return nil, gtserror.NewErrorInternalError(err)
 		}
-
-		// Get a list of all account mutes for requester.
-		allMutes, err := p.state.DB.GetAccountMutes(ctx,
-			requester.ID,
-			nil, // i.e. all
-		)
-		if err != nil && !errors.Is(err, db.ErrNoEntries) {
-			err := gtserror.Newf("error getting account mutes: %w", err)
-			return nil, gtserror.NewErrorInternalError(err)
-		}
-
-		// Compile all account mutes to useable form.
-		mutes = usermute.NewCompiledUserMuteList(allMutes)
 	}
 
 	// Ensure we have valid
@@ -138,7 +125,6 @@ func (p *Processor) getStatusTimeline(
 				requester,
 				filterCtx,
 				filters,
-				mutes,
 			)
 			if err != nil && !errors.Is(err, statusfilter.ErrHideStatus) {
 				return nil, err

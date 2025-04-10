@@ -41,6 +41,9 @@ type Caches struct {
 	// the block []headerfilter.Filter cache.
 	BlockHeaderFilters headerfilter.Cache
 
+	// Mutes ...
+	Mutes MutesCache
+
 	// TTL cache of statuses -> filterable text fields.
 	// To ensure up-to-date fields, cache is keyed as:
 	// `[status.ID][status.UpdatedAt.Unix()]`

@@ -30,7 +30,6 @@ import (
 	webpushgo "github.com/SherClockHolmes/webpush-go"
 	apimodel "github.com/superseriousbusiness/gotosocial/internal/api/model"
 	"github.com/superseriousbusiness/gotosocial/internal/config"
-	"github.com/superseriousbusiness/gotosocial/internal/filter/usermute"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/log"
@@ -49,16 +48,16 @@ type realSender struct {
 
 func (r *realSender) Send(
 	ctx context.Context,
-	notification *gtsmodel.Notification,
-	filters []*gtsmodel.Filter,
-	mutes *usermute.CompiledUserMuteList,
+	target *gtsmodel.Account,
+	notif *gtsmodel.Notification,
+	apiNotif *apimodel.Notification,
 ) error {
 	// Load subscriptions.
-	subscriptions, err := r.state.DB.GetWebPushSubscriptionsByAccountID(ctx, notification.TargetAccountID)
+	subscriptions, err := r.state.DB.GetWebPushSubscriptionsByAccountID(ctx, target.ID)
 	if err != nil {
 		return gtserror.Newf(
 			"error getting Web Push subscriptions for account %s: %w",
-			notification.TargetAccountID,
+			target.ID,
 			err,
 		)
 	}
@@ -67,7 +66,7 @@ func (r *realSender) Send(
 	relevantSubscriptions := slices.DeleteFunc(
 		subscriptions,
 		func(subscription *gtsmodel.WebPushSubscription) bool {
-			return r.shouldSkipSubscription(ctx, notification, subscription)
+			return r.shouldSkipSubscription(ctx, notif, subscription)
 		},
 	)
 	if len(relevantSubscriptions) == 0 {
@@ -80,28 +79,26 @@ func (r *realSender) Send(
 		return gtserror.Newf("error getting VAPID key pair: %w", err)
 	}
 
-	// Get target account settings.
-	targetAccountSettings, err := r.state.DB.GetAccountSettings(ctx, notification.TargetAccountID)
-	if err != nil {
-		return gtserror.Newf("error getting settings for account %s: %w", notification.TargetAccountID, err)
-	}
+	if target.Settings == nil {
+		// Ensure the target account's settings are populated.
+		settings, err := r.state.DB.GetAccountSettings(ctx, target.ID)
+		if err != nil {
+			return gtserror.Newf("error getting settings for account %s: %w", target.ID, err)
+		}
 
-	// Get API representations of notification and accounts involved.
-	apiNotification, err := r.converter.NotificationToAPINotification(ctx, notification, filters, mutes)
-	if err != nil {
-		return gtserror.Newf("error converting notification %s to API representation: %w", notification.ID, err)
+		// Set target's settings.
+		target.Settings = settings
 	}
 
 	// Queue up a .Send() call for each relevant subscription.
 	for _, subscription := range relevantSubscriptions {
 		r.state.Workers.WebPush.Queue.Push(func(ctx context.Context) {
-			if err := r.sendToSubscription(
-				ctx,
+			if err := r.sendToSubscription(ctx,
 				vapidKeyPair,
-				targetAccountSettings,
+				target.Settings,
 				subscription,
-				notification,
-				apiNotification,
+				notif,
+				apiNotif,
 			); err != nil {
 				log.Errorf(
 					ctx,

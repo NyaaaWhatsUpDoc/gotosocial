@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 
+	apimodel "github.com/superseriousbusiness/gotosocial/internal/api/model"
 	"github.com/superseriousbusiness/gotosocial/internal/cache/timeline"
 	statusfilter "github.com/superseriousbusiness/gotosocial/internal/filter/status"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/usermute"
@@ -205,7 +206,7 @@ func (s *Surface) timelineAndNotifyStatusForFollowers(
 			gtsmodel.NotificationStatus,
 			follow.Account,
 			status.Account,
-			status.ID,
+			status,
 		); err != nil {
 			log.Errorf(ctx, "error notifying status for account: %v", err)
 			continue
@@ -369,17 +370,26 @@ func (s *Surface) timelineStatus(
 	mutes *usermute.CompiledUserMuteList,
 ) bool {
 
-	// Attempt to convert status to frontend API representation,
-	// this will check whether status is filtered / muted.
-	apiModel, err := s.Converter.StatusToAPIStatus(ctx,
-		status,
-		account,
-		filterCtx,
-		filters,
-		mutes,
-	)
-	if err != nil && !errors.Is(err, statusfilter.ErrHideStatus) {
-		log.Error(ctx, "error converting status %s to frontend: %v", status.URI, err)
+	// Check whether any mutes indicate status should not be timelined.
+	visible, err := s.MuteFilter.StatusTimelineable(ctx, account, status)
+	if err != nil {
+		log.Errorf(ctx, "error checking status mute: %v", err)
+	}
+
+	var apiModel *apimodel.Status
+
+	if visible {
+		// Attempt to convert status to frontend API representation,
+		// this will check whether status is filtered / muted.
+		apiModel, err = s.Converter.StatusToAPIStatus(ctx,
+			status,
+			account,
+			filterCtx,
+			filters,
+		)
+		if err != nil && !errors.Is(err, statusfilter.ErrHideStatus) {
+			log.Error(ctx, "error converting status %s to frontend: %v", status.URI, err)
+		}
 	}
 
 	// Insert status to timeline cache regardless of
@@ -730,13 +740,20 @@ func (s *Surface) timelineStreamStatusUpdate(
 	mutes *usermute.CompiledUserMuteList,
 ) (bool, error) {
 
+	// Check whether any mutes indicate status should not be timelined.
+	visible, err := s.MuteFilter.StatusTimelineable(ctx, account, status)
+	if err != nil {
+		return false, gtserror.Newf("error checking status mute: %w", err)
+	} else if !visible {
+		return false, nil
+	}
+
 	// Convert updated database model to frontend model.
 	apiStatus, err := s.Converter.StatusToAPIStatus(ctx,
 		status,
 		account,
 		statusfilter.FilterContextHome,
 		filters,
-		mutes,
 	)
 
 	switch {

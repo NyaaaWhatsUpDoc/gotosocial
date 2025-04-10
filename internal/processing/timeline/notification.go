@@ -21,6 +21,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 
 	apimodel "github.com/superseriousbusiness/gotosocial/internal/api/model"
@@ -125,41 +126,24 @@ func (p *Processor) NotificationsGet(
 
 func (p *Processor) NotificationGet(ctx context.Context, account *gtsmodel.Account, targetNotifID string) (*apimodel.Notification, gtserror.WithCode) {
 	notif, err := p.state.DB.GetNotificationByID(ctx, targetNotifID)
-	if err != nil {
-		if errors.Is(err, db.ErrNoEntries) {
-			return nil, gtserror.NewErrorNotFound(err)
-		}
-
-		// Real error.
+	if err != nil && !errors.Is(err, db.ErrNoEntries) {
+		err := gtserror.Newf("error getting from db: %w", err)
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
-	if notifTargetAccountID := notif.TargetAccountID; notifTargetAccountID != account.ID {
-		err = fmt.Errorf("account %s does not have permission to view notification belong to account %s", account.ID, notifTargetAccountID)
+	if notif.TargetAccountID != account.ID {
+		err := gtserror.New("requester does not match notification target")
 		return nil, gtserror.NewErrorNotFound(err)
 	}
 
-	filters, err := p.state.DB.GetFiltersForAccountID(ctx, account.ID)
-	if err != nil {
-		err = gtserror.Newf("couldn't retrieve filters for account %s: %w", account.ID, err)
-		return nil, gtserror.NewErrorInternalError(err)
-	}
+	// NOTE: we specifically don't do any filtering
+	// or mute checking for a notification directly
+	// fetched by ID. only from timelines etc.
 
-	mutes, err := p.state.DB.GetAccountMutes(gtscontext.SetBarebones(ctx), account.ID, nil)
+	apiNotif, err := p.converter.NotificationToAPINotification(ctx, notif, nil)
 	if err != nil {
-		err = gtserror.Newf("couldn't retrieve mutes for account %s: %w", account.ID, err)
-		return nil, gtserror.NewErrorInternalError(err)
-	}
-	compiledMutes := usermute.NewCompiledUserMuteList(mutes)
-
-	apiNotif, err := p.converter.NotificationToAPINotification(ctx, notif, filters, compiledMutes)
-	if err != nil {
-		if errors.Is(err, db.ErrNoEntries) {
-			return nil, gtserror.NewErrorNotFound(err)
-		}
-
-		// Real error.
-		return nil, gtserror.NewErrorInternalError(err)
+		err := gtserror.Newf("error converting to api model: %w", err)
+		return nil, gtserror.WrapWithCode(http.StatusInternalServerError, err)
 	}
 
 	return apiNotif, nil

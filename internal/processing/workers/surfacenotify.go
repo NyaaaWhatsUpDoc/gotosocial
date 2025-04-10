@@ -23,8 +23,7 @@ import (
 	"strings"
 
 	"github.com/superseriousbusiness/gotosocial/internal/db"
-	"github.com/superseriousbusiness/gotosocial/internal/filter/status"
-	"github.com/superseriousbusiness/gotosocial/internal/filter/usermute"
+	statusfilter "github.com/superseriousbusiness/gotosocial/internal/filter/status"
 	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
@@ -80,7 +79,7 @@ func (s *Surface) notifyPendingReply(
 		gtsmodel.NotificationPendingReply,
 		status.InReplyToAccount,
 		status.Account,
-		status.ID,
+		status,
 	); err != nil {
 		return gtserror.Newf("error notifying replied-to account %s: %w", status.InReplyToAccountID, err)
 	}
@@ -139,7 +138,7 @@ func (s *Surface) notifyMentions(
 			gtsmodel.NotificationMention,
 			mention.TargetAccount,
 			mention.OriginAccount,
-			mention.StatusID,
+			mention.Status,
 		); err != nil {
 			errs.Appendf("error notifying mention target %s: %w", mention.TargetAccountID, err)
 			continue
@@ -171,7 +170,7 @@ func (s *Surface) notifyFollowRequest(
 		gtsmodel.NotificationFollowRequest,
 		followReq.TargetAccount,
 		followReq.Account,
-		"",
+		nil,
 	); err != nil {
 		return gtserror.Newf("error notifying follow target %s: %w", followReq.TargetAccountID, err)
 	}
@@ -223,7 +222,7 @@ func (s *Surface) notifyFollow(
 		gtsmodel.NotificationFollow,
 		follow.TargetAccount,
 		follow.Account,
-		"",
+		nil,
 	); err != nil {
 		return gtserror.Newf("error notifying follow target %s: %w", follow.TargetAccountID, err)
 	}
@@ -253,7 +252,7 @@ func (s *Surface) notifyFave(
 		gtsmodel.NotificationFavourite,
 		fave.TargetAccount,
 		fave.Account,
-		fave.StatusID,
+		fave.Status,
 	); err != nil {
 		return gtserror.Newf("error notifying status author %s: %w", fave.TargetAccountID, err)
 	}
@@ -284,7 +283,7 @@ func (s *Surface) notifyPendingFave(
 		gtsmodel.NotificationPendingFave,
 		fave.TargetAccount,
 		fave.Account,
-		fave.StatusID,
+		fave.Status,
 	); err != nil {
 		return gtserror.Newf("error notifying status author %s: %w", fave.TargetAccountID, err)
 	}
@@ -357,7 +356,7 @@ func (s *Surface) notifyAnnounce(
 		gtsmodel.NotificationReblog,
 		boost.BoostOfAccount,
 		boost.Account,
-		boost.ID,
+		boost,
 	); err != nil {
 		return gtserror.Newf("error notifying boost target %s: %w", boost.BoostOfAccountID, err)
 	}
@@ -388,7 +387,7 @@ func (s *Surface) notifyPendingAnnounce(
 		gtsmodel.NotificationPendingReblog,
 		boost.BoostOfAccount,
 		boost.Account,
-		boost.ID,
+		boost,
 	); err != nil {
 		return gtserror.Newf("error notifying boost target %s: %w", boost.BoostOfAccountID, err)
 	}
@@ -466,7 +465,7 @@ func (s *Surface) notifyPollClose(ctx context.Context, status *gtsmodel.Status) 
 			gtsmodel.NotificationPoll,
 			status.Account,
 			status.Account,
-			status.ID,
+			status,
 		); err != nil {
 			errs.Appendf("error notifying poll author: %w", err)
 		}
@@ -485,7 +484,7 @@ func (s *Surface) notifyPollClose(ctx context.Context, status *gtsmodel.Status) 
 			gtsmodel.NotificationPoll,
 			vote.Account,
 			status.Account,
-			status.ID,
+			status,
 		); err != nil {
 			errs.Appendf("error notifying poll voter %s: %w", vote.AccountID, err)
 			continue
@@ -524,7 +523,7 @@ func (s *Surface) notifySignup(ctx context.Context, newUser *gtsmodel.User) erro
 			gtsmodel.NotificationAdminSignup,
 			mod,
 			newUser.Account,
-			"",
+			nil,
 		); err != nil {
 			errs.Appendf("error notifying moderator %s: %w", mod.ID, err)
 			continue
@@ -567,11 +566,18 @@ func (s *Surface) Notify(
 	notificationType gtsmodel.NotificationType,
 	targetAccount *gtsmodel.Account,
 	originAccount *gtsmodel.Account,
-	statusID string,
+	status *gtsmodel.Status,
 ) error {
 	if targetAccount.IsRemote() {
 		// nothing to do.
 		return nil
+	}
+
+	// Get status ID if
+	// a status provided.
+	var statusID string
+	if status != nil {
+		statusID = status.ID
 	}
 
 	// We're doing state-y stuff so get a
@@ -626,29 +632,50 @@ func (s *Surface) Notify(
 	// with the state-y stuff.
 	unlock()
 
-	// Stream notification to the user.
+	if statusID != "" {
+		// Check whether mutes are disabled for this status by target account.
+		notify, err := s.MuteFilter.NotifyForStatus(ctx, targetAccount, status)
+		if err != nil {
+			return gtserror.Newf("error checking status mute: %w", err)
+		}
+
+		if !notify {
+			// Don't notify.
+			return nil
+		}
+	} else {
+		// Check whether mutes are disable from this account by the target account.
+		notify, err := s.MuteFilter.NotifyFromAccount(ctx, targetAccount, originAccount)
+		if err != nil {
+			return gtserror.Newf("error checking user mute: %w", err)
+		}
+
+		if !notify {
+			// Don't notify.
+			return nil
+		}
+	}
+
 	filters, err := s.State.DB.GetFiltersForAccountID(ctx, targetAccount.ID)
 	if err != nil {
 		return gtserror.Newf("couldn't retrieve filters for account %s: %w", targetAccount.ID, err)
 	}
 
-	mutes, err := s.State.DB.GetAccountMutes(gtscontext.SetBarebones(ctx), targetAccount.ID, nil)
-	if err != nil {
-		return gtserror.Newf("couldn't retrieve mutes for account %s: %w", targetAccount.ID, err)
-	}
-	compiledMutes := usermute.NewCompiledUserMuteList(mutes)
-
-	apiNotif, err := s.Converter.NotificationToAPINotification(ctx, notif, filters, compiledMutes)
-	if err != nil {
-		if errors.Is(err, status.ErrHideStatus) {
-			return nil
-		}
+	apiNotif, err := s.Converter.NotificationToAPINotification(ctx, notif, filters)
+	if err != nil && !errors.Is(err, statusfilter.ErrHideStatus) {
 		return gtserror.Newf("error converting notification to api representation: %w", err)
 	}
+
+	// Filtered notification.
+	if apiNotif == nil {
+		return nil
+	}
+
+	// Stream notification to the user.
 	s.Stream.Notify(ctx, targetAccount, apiNotif)
 
 	// Send Web Push notification to the user.
-	if err = s.WebPushSender.Send(ctx, notif, filters, compiledMutes); err != nil {
+	if err = s.WebPushSender.Send(ctx, targetAccount, notif, apiNotif); err != nil {
 		return gtserror.Newf("error sending Web Push notifications: %w", err)
 	}
 

@@ -19,6 +19,7 @@ package workers
 
 import (
 	"github.com/superseriousbusiness/gotosocial/internal/email"
+	"github.com/superseriousbusiness/gotosocial/internal/filter/mutes"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/visibility"
 	"github.com/superseriousbusiness/gotosocial/internal/processing/conversations"
 	"github.com/superseriousbusiness/gotosocial/internal/processing/stream"
@@ -38,6 +39,7 @@ type Surface struct {
 	Converter     *typeutils.Converter
 	Stream        *stream.Processor
 	VisFilter     *visibility.Filter
+	MuteFilter    *mutes.Filter
 	EmailSender   email.Sender
 	WebPushSender webpush.Sender
 	Conversations *conversations.Processor
