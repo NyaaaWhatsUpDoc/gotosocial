@@ -22,6 +22,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/cleaner"
 	"github.com/superseriousbusiness/gotosocial/internal/email"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/interaction"
+	"github.com/superseriousbusiness/gotosocial/internal/filter/mutes"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/visibility"
 	"github.com/superseriousbusiness/gotosocial/internal/processing"
 	"github.com/superseriousbusiness/gotosocial/internal/processing/common"
@@ -67,6 +68,7 @@ func SetupTestStructs(
 	state.Storage = storage
 	typeconverter := typeutils.NewConverter(&state)
 	visFilter := visibility.NewFilter(&state)
+	muteFilter := mutes.NewFilter(&state)
 	intFilter := interaction.NewFilter(&state)
 
 	httpClient := NewMockHTTPClient(nil, rMediaPath)
@@ -86,6 +88,7 @@ func SetupTestStructs(
 		typeconverter,
 		federator,
 		visFilter,
+		muteFilter,
 	)
 
 	processor := processing.NewProcessor(
@@ -99,6 +102,7 @@ func SetupTestStructs(
 		emailSender,
 		webPushSender,
 		visFilter,
+		muteFilter,
 		intFilter,
 	)
 

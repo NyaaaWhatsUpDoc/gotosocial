@@ -44,7 +44,7 @@ func (p *Processor) Read(
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
-	filters, _, errWithCode := p.getFiltersAndMutes(ctx, requestingAccount)
+	filters, errWithCode := p.getFilters(ctx, requestingAccount)
 	if errWithCode != nil {
 		return nil, errWithCode
 	}

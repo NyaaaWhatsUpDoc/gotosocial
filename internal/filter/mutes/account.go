@@ -28,6 +28,11 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 )
 
+// NOTE:
+// we don't bother using the Mutes cache for any
+// of the accounts functions below, as there's only
+// a single cache load required of any UserMute.
+
 // AccountMuted returns whether given target account is muted by requester.
 func (f *Filter) AccountMuted(ctx context.Context, requester *gtsmodel.Account, account *gtsmodel.Account) (bool, error) {
 	mute, expired, err := f.getUserMute(ctx, requester, account)

@@ -31,55 +31,26 @@ import (
 
 // StatusMuted returns whether given target status is muted for requester in the context of timeline visibility.
 // Note this function returns whether the mute value comes with an expiry, useful to know if a cache relies on this value.
-func (f *Filter) StatusMuted(ctx context.Context, requester *gtsmodel.Account, status *gtsmodel.Status) (muted bool, withExpiry bool, err error) {
+func (f *Filter) StatusMuted(ctx context.Context, requester *gtsmodel.Account, status *gtsmodel.Status) (muted bool, err error) {
 	details, now, err := f.getStatusMuteDetails(ctx, requester, status)
 	if err != nil {
-		return false, false, gtserror.Newf("error getting status mute details: %w", err)
+		return false, gtserror.Newf("error getting status mute details: %w", err)
 	}
-
-	// Check if not muted.
-	if !details.Mute {
-		return false, false, nil
-	}
-
-	// Check if mute has no expiry.
-	if details.MuteExpiry.IsZero() {
-		return true, false, nil
-	}
-
-	// Check if the mute has expired.
-	muted = details.MuteExpiry.After(now)
-	withExpiry = true
-	return
+	return details.Mute && !details.MuteExpired(now), nil
 }
 
 // StatusNotificationsMuted returns whether notifications are muted for requester when regarding given target status.
 // Note this function returns whether the mute value comes with an expiry, useful to know if a cache relies on this value.
-func (f *Filter) StatusNotificationsMuted(ctx context.Context, requester *gtsmodel.Account, status *gtsmodel.Status) (muted bool, withExpiry bool, err error) {
+func (f *Filter) StatusNotificationsMuted(ctx context.Context, requester *gtsmodel.Account, status *gtsmodel.Status) (muted bool, err error) {
 	details, now, err := f.getStatusMuteDetails(ctx, requester, status)
 	if err != nil {
-		return false, false, gtserror.Newf("error getting status mute details: %w", err)
+		return false, gtserror.Newf("error getting status mute details: %w", err)
 	}
-
-	// Check if not notif muted.
-	if !details.Notifications {
-		return false, false, nil
-	}
-
-	// Check if notif mute has no expiry.
-	if details.NotificationExpiry.IsZero() {
-		return true, false, nil
-	}
-
-	// Check if the notification mute has expired.
-	muted = details.NotificationExpiry.After(now)
-	withExpiry = true
-	return
+	return details.Notifications && !details.NotificationExpired(now), nil
 }
 
 // getStatusMuteDetails returns the combined mute details
 func (f *Filter) getStatusMuteDetails(ctx context.Context, requester *gtsmodel.Account, status *gtsmodel.Status) (*cache.CachedMute, time.Time, error) {
-	const mtype = cache.MuteTypeStatus
 
 	if requester == nil {
 		// Without auth, there will be no possible
@@ -91,7 +62,7 @@ func (f *Filter) getStatusMuteDetails(ctx context.Context, requester *gtsmodel.A
 	now := time.Now()
 
 	// Using cache loader callback, attempt to load cache mute details about a given status.
-	details, err := f.state.Caches.Mutes.LoadOne("Type,RequesterID,ItemID", func() (*cache.CachedMute, error) {
+	details, err := f.state.Caches.Mutes.LoadOne("RequesterID,ItemID", func() (*cache.CachedMute, error) {
 		var notifs, muted bool
 		var notifExpiry time.Time
 		var muteExpiry time.Time
@@ -155,13 +126,12 @@ func (f *Filter) getStatusMuteDetails(ctx context.Context, requester *gtsmodel.A
 		return &cache.CachedMute{
 			ItemID:             status.ID,
 			RequesterID:        requester.ID,
-			Type:               mtype,
 			Mute:               muted,
 			MuteExpiry:         muteExpiry,
 			Notifications:      notifs,
 			NotificationExpiry: notifExpiry,
 		}, nil
-	}, mtype, requester.ID, status.ID)
+	}, requester.ID, status.ID)
 	if err != nil {
 		return nil, now, err
 	}

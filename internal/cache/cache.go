@@ -41,9 +41,6 @@ type Caches struct {
 	// the block []headerfilter.Filter cache.
 	BlockHeaderFilters headerfilter.Cache
 
-	// Mutes ...
-	Mutes MutesCache
-
 	// TTL cache of statuses -> filterable text fields.
 	// To ensure up-to-date fields, cache is keyed as:
 	// `[status.ID][status.UpdatedAt.Unix()]`
@@ -51,6 +48,10 @@ type Caches struct {
 
 	// Timelines ...
 	Timelines TimelineCaches
+
+	// Mutes provides access to the item mutes
+	// cache. (used by the item mutes filter).
+	Mutes MutesCache
 
 	// Visibility provides access to the item visibility
 	// cache. (used by the visibility filter).
@@ -128,6 +129,7 @@ func (c *Caches) Init() {
 	c.initWebfinger()
 	c.initWebPushSubscription()
 	c.initWebPushSubscriptionIDs()
+	c.initMutes()
 	c.initVisibility()
 }
 

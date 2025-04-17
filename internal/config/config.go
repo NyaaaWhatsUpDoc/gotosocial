@@ -259,6 +259,7 @@ type CacheConfiguration struct {
 	WebPushSubscriptionMemRatio           float64       `name:"web-push-subscription-mem-ratio"`
 	WebPushSubscriptionIDsMemRatio        float64       `name:"web-push-subscription-ids-mem-ratio"`
 	VisibilityMemRatio                    float64       `name:"visibility-mem-ratio"`
+	MutesMemRatio                         float64       `name:"mutes-mem-ratio"`
 }
 
 // MarshalMap will marshal current Configuration into a map structure (useful for JSON/TOML/YAML).

@@ -648,7 +648,7 @@ func (s *Surface) Notify(
 
 	if status != nil {
 		// Check whether status is muted by the target account.
-		muted, _, err := s.MuteFilter.StatusNotificationsMuted(ctx,
+		muted, err := s.MuteFilter.StatusNotificationsMuted(ctx,
 			targetAccount,
 			status,
 		)
@@ -667,13 +667,14 @@ func (s *Surface) Notify(
 		return gtserror.Newf("couldn't retrieve filters for account %s: %w", targetAccount.ID, err)
 	}
 
+	// Convert the notification to frontend API model for streaming / push.
 	apiNotif, err := s.Converter.NotificationToAPINotification(ctx, notif, filters)
 	if err != nil && !errors.Is(err, statusfilter.ErrHideStatus) {
 		return gtserror.Newf("error converting notification to api representation: %w", err)
 	}
 
-	// Filtered notif.
 	if apiNotif == nil {
+		// Filtered.
 		return nil
 	}
 
@@ -681,7 +682,7 @@ func (s *Surface) Notify(
 	s.Stream.Notify(ctx, targetAccount, apiNotif)
 
 	// Send Web Push notification to the user.
-	if err = s.WebPushSender.Send(ctx, targetAccount, notif, apiNotif); err != nil {
+	if err = s.WebPushSender.Send(ctx, notif, apiNotif); err != nil {
 		return gtserror.Newf("error sending Web Push notifications: %w", err)
 	}
 

@@ -236,7 +236,6 @@ func (p *Processor) GetVisibleAPIStatuses(
 	statuses []*gtsmodel.Status,
 	filterContext statusfilter.FilterContext,
 	filters []*gtsmodel.Filter,
-	checkMutes bool,
 ) []apimodel.Status {
 
 	// Start new log entry with
@@ -263,17 +262,15 @@ func (p *Processor) GetVisibleAPIStatuses(
 			continue
 		}
 
-		if checkMutes {
-			// Check whether this status is muted by the requester.
-			muted, _, err := p.muteFilter.StatusMuted(ctx, requester, status)
-			if err != nil {
-				log.Errorf(ctx, "error checking mute: %v", err)
-				continue
-			}
+		// Check whether this status is muted by requesting account.
+		muted, err := p.muteFilter.StatusMuted(ctx, requester, status)
+		if err != nil {
+			log.Errorf(ctx, "error checking mute: %v", err)
+			continue
+		}
 
-			if muted {
-				continue
-			}
+		if muted {
+			continue
 		}
 
 		// Convert to API status, taking mute / filter into account.

@@ -4457,6 +4457,31 @@ func GetCacheVisibilityMemRatio() float64 { return global.GetCacheVisibilityMemR
 // SetCacheVisibilityMemRatio safely sets the value for global configuration 'Cache.VisibilityMemRatio' field
 func SetCacheVisibilityMemRatio(v float64) { global.SetCacheVisibilityMemRatio(v) }
 
+// GetCacheMutesMemRatio safely fetches the Configuration value for state's 'Cache.MutesMemRatio' field
+func (st *ConfigState) GetCacheMutesMemRatio() (v float64) {
+	st.mutex.RLock()
+	v = st.config.Cache.MutesMemRatio
+	st.mutex.RUnlock()
+	return
+}
+
+// SetCacheMutesMemRatio safely sets the Configuration value for state's 'Cache.MutesMemRatio' field
+func (st *ConfigState) SetCacheMutesMemRatio(v float64) {
+	st.mutex.Lock()
+	defer st.mutex.Unlock()
+	st.config.Cache.MutesMemRatio = v
+	st.reloadToViper()
+}
+
+// CacheMutesMemRatioFlag returns the flag name for the 'Cache.MutesMemRatio' field
+func CacheMutesMemRatioFlag() string { return "cache-mutes-mem-ratio" }
+
+// GetCacheMutesMemRatio safely fetches the value for global configuration 'Cache.MutesMemRatio' field
+func GetCacheMutesMemRatio() float64 { return global.GetCacheMutesMemRatio() }
+
+// SetCacheMutesMemRatio safely sets the value for global configuration 'Cache.MutesMemRatio' field
+func SetCacheMutesMemRatio(v float64) { global.SetCacheMutesMemRatio(v) }
+
 // GetAdminAccountUsername safely fetches the Configuration value for state's 'AdminAccountUsername' field
 func (st *ConfigState) GetAdminAccountUsername() (v string) {
 	st.mutex.RLock()

@@ -32,7 +32,7 @@ import (
 type Sender interface {
 
 	// Send queues up a notification for delivery to all of an account's Web Push subscriptions.
-	Send(ctx context.Context, target *gtsmodel.Account, notif *gtsmodel.Notification, apiNotif *apimodel.Notification) error
+	Send(ctx context.Context, notif *gtsmodel.Notification, apiNotif *apimodel.Notification) error
 }
 
 // NewSender creates a new sender from an HTTP client, DB, and worker pool.

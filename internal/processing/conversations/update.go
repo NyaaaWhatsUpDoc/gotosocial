@@ -185,7 +185,7 @@ func (p *Processor) UpdateConversationsForStatus(ctx context.Context, status *gt
 		}
 
 		// Check whether status is muted to local participant.
-		muted, _, err := p.muteFilter.StatusNotificationsMuted(ctx,
+		muted, err := p.muteFilter.StatusNotificationsMuted(ctx,
 			localAccount,
 			status,
 		)

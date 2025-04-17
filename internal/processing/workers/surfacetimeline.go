@@ -23,7 +23,6 @@ import (
 
 	"github.com/superseriousbusiness/gotosocial/internal/cache/timeline"
 	statusfilter "github.com/superseriousbusiness/gotosocial/internal/filter/status"
-	"github.com/superseriousbusiness/gotosocial/internal/filter/usermute"
 	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
@@ -133,8 +132,8 @@ func (s *Surface) timelineAndNotifyStatusForFollowers(
 			continue
 		}
 
-		// Check to see if the status is muted by this follower.
-		muted, withExpiry, err := s.MuteFilter.StatusMuted(ctx,
+		// Check if the status is muted by this follower.
+		muted, err := s.MuteFilter.StatusMuted(ctx,
 			follow.Account,
 			status,
 		)
@@ -143,14 +142,14 @@ func (s *Surface) timelineAndNotifyStatusForFollowers(
 			continue
 		}
 
-		if muted && !withExpiry {
+		if muted {
 			// Nothing to do.
 			continue
 		}
 
-		// Get relevant filters and mutes for this follow's account.
+		// Get relevant filters for this follow's account.
 		// (note the origin account of the follow is receiver of status).
-		filters, _, err := s.getFiltersAndMutes(ctx, follow.AccountID)
+		filters, err := s.getFilters(ctx, follow.AccountID)
 		if err != nil {
 			log.Error(ctx, err)
 			continue
@@ -287,19 +286,12 @@ func (s *Surface) listTimelineStatusForFollow(
 }
 
 // getFiltersAndMutes returns an account's filters and mutes.
-func (s *Surface) getFiltersAndMutes(ctx context.Context, accountID string) ([]*gtsmodel.Filter, *usermute.CompiledUserMuteList, error) {
+func (s *Surface) getFilters(ctx context.Context, accountID string) ([]*gtsmodel.Filter, error) {
 	filters, err := s.State.DB.GetFiltersForAccountID(ctx, accountID)
 	if err != nil {
-		return nil, nil, gtserror.Newf("couldn't retrieve filters for account %s: %w", accountID, err)
+		return nil, gtserror.Newf("couldn't retrieve filters for account %s: %w", accountID, err)
 	}
-
-	mutes, err := s.State.DB.GetAccountMutes(gtscontext.SetBarebones(ctx), accountID, nil)
-	if err != nil {
-		return nil, nil, gtserror.Newf("couldn't retrieve mutes for account %s: %w", accountID, err)
-	}
-
-	compiledMutes := usermute.NewCompiledUserMuteList(mutes)
-	return filters, compiledMutes, err
+	return filters, err
 }
 
 // listEligible checks if the given status is eligible
@@ -432,7 +424,7 @@ func (s *Surface) timelineAndNotifyStatusForTagFollowers(
 	// Insert the status into the home timeline of each tag follower.
 	errs := gtserror.MultiError{}
 	for _, tagFollowerAccount := range tagFollowerAccounts {
-		filters, _, err := s.getFiltersAndMutes(ctx, tagFollowerAccount.ID)
+		filters, err := s.getFilters(ctx, tagFollowerAccount.ID)
 		if err != nil {
 			errs.Append(err)
 			continue
@@ -614,7 +606,7 @@ func (s *Surface) timelineStatusUpdateForFollowers(
 
 		// Get relevant filters and mutes for this follow's account.
 		// (note the origin account of the follow is receiver of status).
-		filters, mutes, err := s.getFiltersAndMutes(ctx, follow.AccountID)
+		filters, err := s.getFilters(ctx, follow.AccountID)
 		if err != nil {
 			log.Error(ctx, err)
 			continue
@@ -625,7 +617,6 @@ func (s *Surface) timelineStatusUpdateForFollowers(
 			status,
 			follow,
 			filters,
-			mutes,
 		)
 		if err != nil {
 			log.Errorf(ctx, "error list timelining status: %v", err)
@@ -671,7 +662,6 @@ func (s *Surface) listTimelineStatusUpdateForFollow(
 	status *gtsmodel.Status,
 	follow *gtsmodel.Follow,
 	filters []*gtsmodel.Filter,
-	mutes *usermute.CompiledUserMuteList,
 ) (bool, bool, error) {
 
 	// Get all lists that contain this given follow.
@@ -783,7 +773,7 @@ func (s *Surface) timelineStatusUpdateForTagFollowers(
 	// Stream the update to the home timeline of each tag follower.
 	errs := gtserror.MultiError{}
 	for _, tagFollowerAccount := range tagFollowerAccounts {
-		filters, _, err := s.getFiltersAndMutes(ctx, tagFollowerAccount.ID)
+		filters, err := s.getFilters(ctx, tagFollowerAccount.ID)
 		if err != nil {
 			errs.Append(err)
 			continue

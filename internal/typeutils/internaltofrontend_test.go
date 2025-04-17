@@ -466,7 +466,7 @@ func (suite *InternalToFrontendTestSuite) TestLocalInstanceAccountToFrontendBloc
 func (suite *InternalToFrontendTestSuite) TestStatusToFrontend() {
 	testStatus := suite.testStatuses["admin_account_status_1"]
 	requestingAccount := suite.testAccounts["local_account_1"]
-	apiStatus, err := suite.typeconverter.StatusToAPIStatus(context.Background(), testStatus, requestingAccount, statusfilter.FilterContextNone, nil, nil)
+	apiStatus, err := suite.typeconverter.StatusToAPIStatus(context.Background(), testStatus, requestingAccount, statusfilter.FilterContextNone, nil)
 	suite.NoError(err)
 
 	b, err := json.MarshalIndent(apiStatus, "", "  ")
@@ -614,7 +614,7 @@ func (suite *InternalToFrontendTestSuite) TestStatusToFrontendHTMLContentWarning
 	testStatus.ContentWarning = `<p>First paragraph of content warning</p><h4>Here's the title!</h4><p></p><p>Big boobs<br>Tee hee!<br><br>Some more text<br>And a bunch more<br><br>Hasta la victoria siempre!</p>`
 
 	requestingAccount := suite.testAccounts["local_account_1"]
-	apiStatus, err := suite.typeconverter.StatusToAPIStatus(context.Background(), testStatus, requestingAccount, statusfilter.FilterContextNone, nil, nil)
+	apiStatus, err := suite.typeconverter.StatusToAPIStatus(context.Background(), testStatus, requestingAccount, statusfilter.FilterContextNone, nil)
 	suite.NoError(err)
 
 	b, err := json.MarshalIndent(apiStatus, "", "  ")
@@ -765,7 +765,7 @@ func (suite *InternalToFrontendTestSuite) TestStatusToFrontendApplicationDeleted
 	}
 
 	requestingAccount := suite.testAccounts["local_account_1"]
-	apiStatus, err := suite.typeconverter.StatusToAPIStatus(ctx, testStatus, requestingAccount, statusfilter.FilterContextNone, nil, nil)
+	apiStatus, err := suite.typeconverter.StatusToAPIStatus(ctx, testStatus, requestingAccount, statusfilter.FilterContextNone, nil)
 	suite.NoError(err)
 
 	b, err := json.MarshalIndent(apiStatus, "", "  ")
@@ -939,7 +939,6 @@ func (suite *InternalToFrontendTestSuite) filteredStatusToFrontend(action gtsmod
 		requestingAccount,
 		statusfilter.FilterContextHome,
 		requestingAccountFilters,
-		nil,
 	)
 }
 
@@ -1448,7 +1447,6 @@ func (suite *InternalToFrontendTestSuite) testHashtagFilteredStatusToFrontend(wh
 		requestingAccount,
 		statusfilter.FilterContextHome,
 		[]*gtsmodel.Filter{filter},
-		nil,
 	)
 	if err != nil {
 		suite.FailNow(err.Error())
@@ -1471,30 +1469,6 @@ func (suite *InternalToFrontendTestSuite) TestHashtagAnywhereFilteredStatusToFro
 
 func (suite *InternalToFrontendTestSuite) TestHashtagAnywhereFilteredBoostToFrontend() {
 	suite.testHashtagFilteredStatusToFrontend(false, true)
-}
-
-// Test that a status from a user muted by the requesting user results in the ErrHideStatus error.
-func (suite *InternalToFrontendTestSuite) TestMutedStatusToFrontend() {
-	testStatus := suite.testStatuses["admin_account_status_1"]
-	requestingAccount := suite.testAccounts["local_account_1"]
-
-	mutes := usermute.NewCompiledUserMuteList([]*gtsmodel.UserMute{
-		{
-			AccountID:       requestingAccount.ID,
-			TargetAccountID: testStatus.AccountID,
-			Notifications:   util.Ptr(false),
-		},
-	})
-
-	_, err := suite.typeconverter.StatusToAPIStatus(
-		context.Background(),
-		testStatus,
-		requestingAccount,
-		statusfilter.FilterContextHome,
-		nil,
-		mutes,
-	)
-	suite.ErrorIs(err, statusfilter.ErrHideStatus)
 }
 
 // Test that a status replying to a user muted by the requesting user results in the ErrHideStatus error.
@@ -1868,7 +1842,7 @@ func (suite *InternalToFrontendTestSuite) TestStatusToFrontendUnknownLanguage() 
 	*testStatus = *suite.testStatuses["admin_account_status_1"]
 	testStatus.Language = ""
 	requestingAccount := suite.testAccounts["local_account_1"]
-	apiStatus, err := suite.typeconverter.StatusToAPIStatus(context.Background(), testStatus, requestingAccount, statusfilter.FilterContextNone, nil, nil)
+	apiStatus, err := suite.typeconverter.StatusToAPIStatus(context.Background(), testStatus, requestingAccount, statusfilter.FilterContextNone, nil)
 	suite.NoError(err)
 
 	b, err := json.MarshalIndent(apiStatus, "", "  ")
@@ -2014,7 +1988,7 @@ func (suite *InternalToFrontendTestSuite) TestStatusToFrontendPartialInteraction
 	*testStatus = *suite.testStatuses["local_account_1_status_3"]
 	testStatus.Language = ""
 	requestingAccount := suite.testAccounts["admin_account"]
-	apiStatus, err := suite.typeconverter.StatusToAPIStatus(context.Background(), testStatus, requestingAccount, statusfilter.FilterContextNone, nil, nil)
+	apiStatus, err := suite.typeconverter.StatusToAPIStatus(context.Background(), testStatus, requestingAccount, statusfilter.FilterContextNone, nil)
 	suite.NoError(err)
 
 	b, err := json.MarshalIndent(apiStatus, "", "  ")
@@ -2116,7 +2090,6 @@ func (suite *InternalToFrontendTestSuite) TestStatusToAPIStatusPendingApproval()
 		testStatus,
 		requestingAccount,
 		statusfilter.FilterContextNone,
-		nil,
 		nil,
 	)
 	if err != nil {
@@ -3813,11 +3786,10 @@ func (suite *InternalToFrontendTestSuite) TestIntReqToAPI() {
 
 func (suite *InternalToFrontendTestSuite) TestConversationToAPISelfConvo() {
 	var (
-		ctx                                       = context.Background()
-		requester                                 = suite.testAccounts["local_account_1"]
-		lastStatus                                = suite.testStatuses["local_account_1_status_1"]
-		filters    []*gtsmodel.Filter             = nil
-		mutes      *usermute.CompiledUserMuteList = nil
+		ctx                           = context.Background()
+		requester                     = suite.testAccounts["local_account_1"]
+		lastStatus                    = suite.testStatuses["local_account_1_status_1"]
+		filters    []*gtsmodel.Filter = nil
 	)
 
 	convo := &gtsmodel.Conversation{
@@ -3836,7 +3808,6 @@ func (suite *InternalToFrontendTestSuite) TestConversationToAPISelfConvo() {
 		convo,
 		requester,
 		filters,
-		mutes,
 	)
 	if err != nil {
 		suite.FailNow(err.Error())
@@ -3973,11 +3944,10 @@ func (suite *InternalToFrontendTestSuite) TestConversationToAPISelfConvo() {
 
 func (suite *InternalToFrontendTestSuite) TestConversationToAPI() {
 	var (
-		ctx                                       = context.Background()
-		requester                                 = suite.testAccounts["local_account_1"]
-		lastStatus                                = suite.testStatuses["local_account_1_status_1"]
-		filters    []*gtsmodel.Filter             = nil
-		mutes      *usermute.CompiledUserMuteList = nil
+		ctx                           = context.Background()
+		requester                     = suite.testAccounts["local_account_1"]
+		lastStatus                    = suite.testStatuses["local_account_1_status_1"]
+		filters    []*gtsmodel.Filter = nil
 	)
 
 	convo := &gtsmodel.Conversation{
@@ -3998,7 +3968,6 @@ func (suite *InternalToFrontendTestSuite) TestConversationToAPI() {
 		convo,
 		requester,
 		filters,
-		mutes,
 	)
 	if err != nil {
 		suite.FailNow(err.Error())

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/suite"
+	"github.com/superseriousbusiness/gotosocial/internal/filter/mutes"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/visibility"
 	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
@@ -44,6 +45,7 @@ func (suite *SurfaceNotifyTestSuite) TestSpamNotifs() {
 		Converter:     testStructs.TypeConverter,
 		Stream:        testStructs.Processor.Stream(),
 		VisFilter:     visibility.NewFilter(testStructs.State),
+		MuteFilter:    mutes.NewFilter(testStructs.State),
 		EmailSender:   testStructs.EmailSender,
 		WebPushSender: testStructs.WebPushSender,
 		Conversations: testStructs.Processor.Conversations(),
@@ -75,7 +77,7 @@ func (suite *SurfaceNotifyTestSuite) TestSpamNotifs() {
 				notificationType,
 				targetAccount,
 				originAccount,
-				"",
+				nil,
 			); err != nil {
 				suite.FailNow(err.Error())
 			}

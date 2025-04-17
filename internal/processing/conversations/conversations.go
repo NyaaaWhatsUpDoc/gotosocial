@@ -23,9 +23,7 @@ import (
 
 	"github.com/superseriousbusiness/gotosocial/internal/db"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/mutes"
-	"github.com/superseriousbusiness/gotosocial/internal/filter/usermute"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/visibility"
-	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/state"
@@ -99,13 +97,13 @@ func (p *Processor) getConversationOwnedBy(
 }
 
 // getFiltersAndMutes gets the given account's filters and compiled mute list.
-func (p *Processor) getFiltersAndMutes(
+func (p *Processor) getFilters(
 	ctx context.Context,
 	requestingAccount *gtsmodel.Account,
-) ([]*gtsmodel.Filter, *usermute.CompiledUserMuteList, gtserror.WithCode) {
+) ([]*gtsmodel.Filter, gtserror.WithCode) {
 	filters, err := p.state.DB.GetFiltersForAccountID(ctx, requestingAccount.ID)
 	if err != nil {
-		return nil, nil, gtserror.NewErrorInternalError(
+		return nil, gtserror.NewErrorInternalError(
 			gtserror.Newf(
 				"DB error getting filters for account %s: %w",
 				requestingAccount.ID,
@@ -113,18 +111,5 @@ func (p *Processor) getFiltersAndMutes(
 			),
 		)
 	}
-
-	mutes, err := p.state.DB.GetAccountMutes(gtscontext.SetBarebones(ctx), requestingAccount.ID, nil)
-	if err != nil {
-		return nil, nil, gtserror.NewErrorInternalError(
-			gtserror.Newf(
-				"DB error getting mutes for account %s: %w",
-				requestingAccount.ID,
-				err,
-			),
-		)
-	}
-	compiledMutes := usermute.NewCompiledUserMuteList(mutes)
-
-	return filters, compiledMutes, nil
+	return filters, nil
 }

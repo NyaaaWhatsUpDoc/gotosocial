@@ -101,7 +101,7 @@ func (p *Processor) NotificationsGet(
 
 		if n.Status != nil {
 			// A status is attached, check whether status muted.
-			muted, _, err = p.muteFilter.StatusNotificationsMuted(ctx,
+			muted, err = p.muteFilter.StatusNotificationsMuted(ctx,
 				requester,
 				n.Status,
 			)

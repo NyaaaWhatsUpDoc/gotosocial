@@ -145,6 +145,7 @@ func (st *ConfigState) reloadFromViper() {
 		// empty config before marshaling
 		c.ZeroFields = true
 
+		// copy old decode hook.
 		oldhook := c.DecodeHook
 
 		// Use the TextUnmarshaler interface when decoding.

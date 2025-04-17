@@ -99,11 +99,22 @@ func (p *Processor) TagTimelineGet(
 		func(s *gtsmodel.Status) bool {
 
 			// Check the visibility of passed status to requesting user.
-			ok, err := p.visFilter.StatusHomeTimelineable(ctx, requester, s)
+			ok, err := p.visFilter.StatusPublicTimelineable(ctx, requester, s)
 			if err != nil {
-				log.Errorf(ctx, "error filtering status %s: %v", s.URI, err)
+				log.Errorf(ctx, "error checking status %s visibility: %v", s.URI, err)
+			} else if !ok {
+				return true
 			}
-			return !ok
+
+			// Check if status been muted by requester from timelines.
+			muted, err := p.muteFilter.StatusMuted(ctx, requester, s)
+			if err != nil {
+				log.Errorf(ctx, "error checking status %s mutes: %v", s.URI, err)
+			} else if muted {
+				return true
+			}
+
+			return false
 		},
 	)
 }

@@ -94,11 +94,11 @@ func (p *Processor) HomeTimelineGet(
 				return true
 			}
 
-			// Check if status been muted (with any expiry) by user from timelines.
-			muted, withExpiry, err := p.muteFilter.StatusMuted(ctx, requester, s)
+			// Check if status been muted by requester from timelines.
+			muted, err := p.muteFilter.StatusMuted(ctx, requester, s)
 			if err != nil {
 				log.Errorf(ctx, "error checking status %s mutes: %v", s.URI, err)
-			} else if muted && !withExpiry {
+			} else if muted {
 				return true
 			}
 

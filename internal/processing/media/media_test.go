@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/suite"
 	"github.com/superseriousbusiness/gotosocial/internal/admin"
 	"github.com/superseriousbusiness/gotosocial/internal/db"
+	"github.com/superseriousbusiness/gotosocial/internal/filter/mutes"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/visibility"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 	"github.com/superseriousbusiness/gotosocial/internal/media"
@@ -82,8 +83,9 @@ func (suite *MediaStandardTestSuite) SetupTest() {
 	suite.transportController = testrig.NewTestTransportController(&suite.state, testrig.NewMockHTTPClient(nil, "../../../testrig/media"))
 
 	federator := testrig.NewTestFederator(&suite.state, suite.transportController, suite.mediaManager)
-	filter := visibility.NewFilter(&suite.state)
-	common := common.New(&suite.state, suite.mediaManager, suite.tc, federator, filter)
+	visFilter := visibility.NewFilter(&suite.state)
+	muteFilter := mutes.NewFilter(&suite.state)
+	common := common.New(&suite.state, suite.mediaManager, suite.tc, federator, visFilter, muteFilter)
 
 	suite.mediaProcessor = mediaprocessing.New(&common, &suite.state, suite.tc, federator, suite.mediaManager, suite.transportController)
 	testrig.StandardDBSetup(suite.db, nil)

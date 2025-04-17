@@ -33,7 +33,7 @@ func (c *Caches) initMutes() {
 	// Calculate maximum cache size.
 	cap := calculateResultCacheMax(
 		sizeofVisibility(), // model in-mem size.
-		config.GetCacheVisibilityMemRatio(),
+		config.GetCacheMutesMemRatio(),
 	)
 
 	log.Infof(nil, "Mutes cache size = %d", cap)
@@ -48,24 +48,13 @@ func (c *Caches) initMutes() {
 		Indices: []structr.IndexConfig{
 			{Fields: "ItemID", Multiple: true},
 			{Fields: "RequesterID", Multiple: true},
-			{Fields: "Type,RequesterID,ItemID"},
+			{Fields: "RequesterID,ItemID"},
 		},
 		MaxSize:   cap,
 		IgnoreErr: ignoreErrors,
 		Copy:      copyF,
 	})
 }
-
-type MuteType byte
-
-const (
-	MuteTypeAccount = MuteType('a')
-	MuteTypeStatus  = MuteType('s')
-	MuteTypeThread  = MuteType('t')
-	MuteTypeHome    = MuteType('h')
-	MuteTypePublic  = MuteType('p')
-	MuteTypeNotifs  = MuteType('n')
-)
 
 // CachedMute ...
 type CachedMute struct {
@@ -78,26 +67,30 @@ type CachedMute struct {
 	// account for this user mute lookup.
 	RequesterID string
 
-	// Type is the lookup type.
-	Type MuteType
-
-	// Mute ...
+	// Mute indicates whether ItemID
+	// is muted by RequesterID.
 	Mute bool
 
-	// ...
+	// MuteExpiry stores the time at which
+	// (if any) the stored mute value expires.
 	MuteExpiry time.Time
 
-	// Notifications ...
+	// Notifications indicates whether
+	// this mute should prevent notifications
+	// being shown for ItemID to RequesterID.
 	Notifications bool
 
-	// ...
+	// NotificationExpiry stores the time at which
+	// (if any) the stored notification value expires.
 	NotificationExpiry time.Time
 }
 
+// MuteExpired returns whether the mute value has expired.
 func (m *CachedMute) MuteExpired(now time.Time) bool {
 	return !m.MuteExpiry.IsZero() && !m.MuteExpiry.After(now)
 }
 
+// NotificationExpired returns whether the notification mute value has expired.
 func (m *CachedMute) NotificationExpired(now time.Time) bool {
 	return !m.NotificationExpiry.IsZero() && !m.NotificationExpiry.After(now)
 }

@@ -48,18 +48,16 @@ type realSender struct {
 
 func (r *realSender) Send(
 	ctx context.Context,
-	target *gtsmodel.Account,
 	notif *gtsmodel.Notification,
 	apiNotif *apimodel.Notification,
 ) error {
+	// Get notification target.
+	target := notif.TargetAccount
+
 	// Load subscriptions.
 	subscriptions, err := r.state.DB.GetWebPushSubscriptionsByAccountID(ctx, target.ID)
 	if err != nil {
-		return gtserror.Newf(
-			"error getting Web Push subscriptions for account %s: %w",
-			target.ID,
-			err,
-		)
+		return gtserror.Newf("error getting Web Push subscriptions for account %s: %w", target.URI, err)
 	}
 
 	// Subscriptions we're actually going to send to.
@@ -83,7 +81,7 @@ func (r *realSender) Send(
 		// Ensure the target account's settings are populated.
 		settings, err := r.state.DB.GetAccountSettings(ctx, target.ID)
 		if err != nil {
-			return gtserror.Newf("error getting settings for account %s: %w", target.ID, err)
+			return gtserror.Newf("error getting settings for account %s: %w", target.URI, err)
 		}
 
 		// Set target's settings.
@@ -100,8 +98,7 @@ func (r *realSender) Send(
 				notif,
 				apiNotif,
 			); err != nil {
-				log.Errorf(
-					ctx,
+				log.Errorf(ctx,
 					"error sending Web Push notification for subscription with token ID %s: %v",
 					subscription.TokenID,
 					err,
@@ -134,8 +131,7 @@ func (r *realSender) shouldSkipSubscription(
 		// Allow if the subscription account follows the notifying account.
 		isFollowing, err := r.state.DB.IsFollowing(ctx, subscription.AccountID, notification.OriginAccountID)
 		if err != nil {
-			log.Errorf(
-				ctx,
+			log.Errorf(ctx,
 				"error checking whether account %s follows account %s: %v",
 				subscription.AccountID,
 				notification.OriginAccountID,
@@ -149,8 +145,7 @@ func (r *realSender) shouldSkipSubscription(
 		// Allow if the notifying account follows the subscription account.
 		isFollowing, err := r.state.DB.IsFollowing(ctx, notification.OriginAccountID, subscription.AccountID)
 		if err != nil {
-			log.Errorf(
-				ctx,
+			log.Errorf(ctx,
 				"error checking whether account %s follows account %s: %v",
 				notification.OriginAccountID,
 				subscription.AccountID,
@@ -165,8 +160,7 @@ func (r *realSender) shouldSkipSubscription(
 		return true
 
 	default:
-		log.Errorf(
-			ctx,
+		log.Errorf(ctx,
 			"unknown Web Push notification policy for subscription with token ID %s: %d",
 			subscription.TokenID,
 			subscription.Policy,

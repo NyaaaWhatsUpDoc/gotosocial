@@ -307,7 +307,6 @@ func (p *Processor) ContextGet(
 		threadContext.ancestors,
 		statusfilter.FilterContextThread,
 		filters,
-		true,
 	)
 
 	// Convert and filter the thread context descendants
@@ -316,7 +315,6 @@ func (p *Processor) ContextGet(
 		threadContext.descendants,
 		statusfilter.FilterContextThread,
 		filters,
-		true,
 	)
 
 	return &apiContext, nil

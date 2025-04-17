@@ -64,7 +64,7 @@ func (p *Processor) GetAll(
 
 	items := make([]interface{}, 0, count)
 
-	filters, _, errWithCode := p.getFiltersAndMutes(ctx, requestingAccount)
+	filters, errWithCode := p.getFilters(ctx, requestingAccount)
 	if errWithCode != nil {
 		return nil, errWithCode
 	}
