@@ -81,12 +81,23 @@ type CachedMute struct {
 	// Type is the lookup type.
 	Type MuteType
 
-	// ExpiresAt ...
-	ExpiresAt time.Time
-
 	// Mute ...
 	Mute bool
 
+	// ...
+	MuteExpiry time.Time
+
 	// Notifications ...
 	Notifications bool
+
+	// ...
+	NotificationExpiry time.Time
+}
+
+func (m *CachedMute) MuteExpired(now time.Time) bool {
+	return !m.MuteExpiry.IsZero() && !m.MuteExpiry.After(now)
+}
+
+func (m *CachedMute) NotificationExpired(now time.Time) bool {
+	return !m.NotificationExpiry.IsZero() && !m.NotificationExpiry.After(now)
 }

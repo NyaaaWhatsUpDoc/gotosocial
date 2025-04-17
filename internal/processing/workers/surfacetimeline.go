@@ -21,7 +21,6 @@ import (
 	"context"
 	"errors"
 
-	apimodel "github.com/superseriousbusiness/gotosocial/internal/api/model"
 	"github.com/superseriousbusiness/gotosocial/internal/cache/timeline"
 	statusfilter "github.com/superseriousbusiness/gotosocial/internal/filter/status"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/usermute"
@@ -120,11 +119,12 @@ func (s *Surface) timelineAndNotifyStatusForFollowers(
 		// if something is hometimelineable according to this filter,
 		// it's also eligible to appear in exclusive lists,
 		// even if it ultimately doesn't appear on the home timeline.
-		timelineable, err := s.VisFilter.StatusHomeTimelineable(
-			ctx, follow.Account, status,
+		timelineable, err := s.VisFilter.StatusHomeTimelineable(ctx,
+			follow.Account,
+			status,
 		)
 		if err != nil {
-			log.Errorf(ctx, "error checking status home visibility for follow: %v", err)
+			log.Errorf(ctx, "error checking status home visibility: %v", err)
 			continue
 		}
 
@@ -133,9 +133,24 @@ func (s *Surface) timelineAndNotifyStatusForFollowers(
 			continue
 		}
 
+		// Check to see if the status is muted by this follower.
+		muted, withExpiry, err := s.MuteFilter.StatusMuted(ctx,
+			follow.Account,
+			status,
+		)
+		if err != nil {
+			log.Errorf(ctx, "error checking status mute: %v", err)
+			continue
+		}
+
+		if muted && !withExpiry {
+			// Nothing to do.
+			continue
+		}
+
 		// Get relevant filters and mutes for this follow's account.
 		// (note the origin account of the follow is receiver of status).
-		filters, mutes, err := s.getFiltersAndMutes(ctx, follow.AccountID)
+		filters, _, err := s.getFiltersAndMutes(ctx, follow.AccountID)
 		if err != nil {
 			log.Error(ctx, err)
 			continue
@@ -146,7 +161,6 @@ func (s *Surface) timelineAndNotifyStatusForFollowers(
 			status,
 			follow,
 			filters,
-			mutes,
 		)
 		if err != nil {
 			log.Errorf(ctx, "error list timelining status: %v", err)
@@ -169,7 +183,6 @@ func (s *Surface) timelineAndNotifyStatusForFollowers(
 				stream.TimelineHome,
 				statusfilter.FilterContextHome,
 				filters,
-				mutes,
 			); homeTimelined {
 
 				// If hometimelined, add to list of returned account IDs.
@@ -227,7 +240,6 @@ func (s *Surface) listTimelineStatusForFollow(
 	status *gtsmodel.Status,
 	follow *gtsmodel.Follow,
 	filters []*gtsmodel.Filter,
-	mutes *usermute.CompiledUserMuteList,
 ) (timelined bool, exclusive bool, err error) {
 
 	// Get all lists that contain this given follow.
@@ -265,7 +277,6 @@ func (s *Surface) listTimelineStatusForFollow(
 			stream.TimelineList+":"+list.ID, // key streamType to this specific list
 			statusfilter.FilterContextHome,
 			filters,
-			mutes,
 		)
 
 		// Update flag based on if timelined.
@@ -367,29 +378,18 @@ func (s *Surface) timelineStatus(
 	streamType string,
 	filterCtx statusfilter.FilterContext,
 	filters []*gtsmodel.Filter,
-	mutes *usermute.CompiledUserMuteList,
 ) bool {
 
-	// Check whether any mutes indicate status should not be timelined.
-	visible, err := s.MuteFilter.StatusTimelineable(ctx, account, status)
-	if err != nil {
-		log.Errorf(ctx, "error checking status mute: %v", err)
-	}
-
-	var apiModel *apimodel.Status
-
-	if visible {
-		// Attempt to convert status to frontend API representation,
-		// this will check whether status is filtered / muted.
-		apiModel, err = s.Converter.StatusToAPIStatus(ctx,
-			status,
-			account,
-			filterCtx,
-			filters,
-		)
-		if err != nil && !errors.Is(err, statusfilter.ErrHideStatus) {
-			log.Error(ctx, "error converting status %s to frontend: %v", status.URI, err)
-		}
+	// Attempt to convert status to frontend API representation,
+	// this will check whether status is filtered / muted.
+	apiModel, err := s.Converter.StatusToAPIStatus(ctx,
+		status,
+		account,
+		filterCtx,
+		filters,
+	)
+	if err != nil && !errors.Is(err, statusfilter.ErrHideStatus) {
+		log.Error(ctx, "error converting status %s to frontend: %v", status.URI, err)
 	}
 
 	// Insert status to timeline cache regardless of
@@ -398,7 +398,7 @@ func (s *Surface) timelineStatus(
 
 	if apiModel == nil {
 		// Status was
-		// filtered / muted.
+		// filtered.
 		return false
 	}
 
@@ -432,7 +432,7 @@ func (s *Surface) timelineAndNotifyStatusForTagFollowers(
 	// Insert the status into the home timeline of each tag follower.
 	errs := gtserror.MultiError{}
 	for _, tagFollowerAccount := range tagFollowerAccounts {
-		filters, mutes, err := s.getFiltersAndMutes(ctx, tagFollowerAccount.ID)
+		filters, _, err := s.getFiltersAndMutes(ctx, tagFollowerAccount.ID)
 		if err != nil {
 			errs.Append(err)
 			continue
@@ -445,7 +445,6 @@ func (s *Surface) timelineAndNotifyStatusForTagFollowers(
 			stream.TimelineHome,
 			statusfilter.FilterContextHome,
 			filters,
-			mutes,
 		)
 	}
 
@@ -647,7 +646,6 @@ func (s *Surface) timelineStatusUpdateForFollowers(
 			status,
 			stream.TimelineHome,
 			filters,
-			mutes,
 		)
 		if err != nil {
 			log.Errorf(ctx, "error home timelining status: %v", err)
@@ -713,7 +711,6 @@ func (s *Surface) listTimelineStatusUpdateForFollow(
 			status,
 			stream.TimelineList+":"+list.ID, // key streamType to this specific list
 			filters,
-			mutes,
 		)
 		if err != nil {
 			log.Errorf(ctx, "error adding status to list timeline: %v", err)
@@ -737,16 +734,7 @@ func (s *Surface) timelineStreamStatusUpdate(
 	status *gtsmodel.Status,
 	streamType string,
 	filters []*gtsmodel.Filter,
-	mutes *usermute.CompiledUserMuteList,
 ) (bool, error) {
-
-	// Check whether any mutes indicate status should not be timelined.
-	visible, err := s.MuteFilter.StatusTimelineable(ctx, account, status)
-	if err != nil {
-		return false, gtserror.Newf("error checking status mute: %w", err)
-	} else if !visible {
-		return false, nil
-	}
 
 	// Convert updated database model to frontend model.
 	apiStatus, err := s.Converter.StatusToAPIStatus(ctx,
@@ -795,7 +783,7 @@ func (s *Surface) timelineStatusUpdateForTagFollowers(
 	// Stream the update to the home timeline of each tag follower.
 	errs := gtserror.MultiError{}
 	for _, tagFollowerAccount := range tagFollowerAccounts {
-		filters, mutes, err := s.getFiltersAndMutes(ctx, tagFollowerAccount.ID)
+		filters, _, err := s.getFiltersAndMutes(ctx, tagFollowerAccount.ID)
 		if err != nil {
 			errs.Append(err)
 			continue
@@ -807,7 +795,6 @@ func (s *Surface) timelineStatusUpdateForTagFollowers(
 			status,
 			stream.TimelineHome,
 			filters,
-			mutes,
 		); err != nil {
 			errs.Appendf(
 				"error updating status %s on home timeline for account %s: %w",

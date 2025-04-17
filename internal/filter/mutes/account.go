@@ -28,11 +28,33 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 )
 
-func (f *Filter) NotifyFromAccount(ctx context.Context, requester *gtsmodel.Account, account *gtsmodel.Account) (bool, error) {
+// AccountMuted returns whether given target account is muted by requester.
+func (f *Filter) AccountMuted(ctx context.Context, requester *gtsmodel.Account, account *gtsmodel.Account) (bool, error) {
+	mute, expired, err := f.getUserMute(ctx, requester, account)
+	if err != nil {
+		return false, err
+	} else if mute == nil {
+		return false, nil
+	}
+	return !expired, nil
+}
+
+// AccountNotificationsMuted returns whether notifications are muted for requester when incoming from given target account.
+func (f *Filter) AccountNotificationsMuted(ctx context.Context, requester *gtsmodel.Account, account *gtsmodel.Account) (bool, error) {
+	mute, expired, err := f.getUserMute(ctx, requester, account)
+	if err != nil {
+		return false, err
+	} else if mute == nil {
+		return false, nil
+	}
+	return *mute.Notifications && !expired, nil
+}
+
+func (f *Filter) getUserMute(ctx context.Context, requester *gtsmodel.Account, account *gtsmodel.Account) (*gtsmodel.UserMute, bool, error) {
 	if requester == nil {
 		// Un-authed so no account
 		// is possible to be muted.
-		return true, nil
+		return nil, false, nil
 	}
 
 	// Look for mute against target.
@@ -42,11 +64,17 @@ func (f *Filter) NotifyFromAccount(ctx context.Context, requester *gtsmodel.Acco
 		account.ID,
 	)
 	if err != nil && !errors.Is(err, db.ErrNoEntries) {
-		return false, gtserror.Newf("db error getting user mute: %w", err)
+		return nil, false, gtserror.Newf("db error getting user mute: %w", err)
+	}
+
+	if mute == nil {
+		// No user mute exists!
+		return nil, false, nil
 	}
 
 	// Get current time.
 	now := time.Now()
 
-	return *mute.Notifications && mute.Expired(now), nil
+	// Return whether mute is expired.
+	return mute, mute.Expired(now), nil
 }

@@ -25,7 +25,6 @@ import (
 
 	apimodel "github.com/superseriousbusiness/gotosocial/internal/api/model"
 	statusfilter "github.com/superseriousbusiness/gotosocial/internal/filter/status"
-	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
 	"github.com/superseriousbusiness/gotosocial/internal/gtsmodel"
 )
@@ -291,26 +290,8 @@ func (p *Processor) ContextGet(
 		return nil, gtserror.NewErrorInternalError(err)
 	}
 
-	// Retrieve mutes as they affect
-	// what should be shown to requester.
-	mutes, err := p.state.DB.GetAccountMutes(
-		// No need to populate mutes,
-		// IDs are enough here.
-		gtscontext.SetBarebones(ctx),
-		requester.ID,
-		nil, // No paging - get all.
-	)
-	if err != nil {
-		err = gtserror.Newf(
-			"couldn't retrieve mutes for account %s: %w",
-			requester.ID, err,
-		)
-		return nil, gtserror.NewErrorInternalError(err)
-	}
-
 	// Retrieve the full thread context.
-	threadContext, errWithCode := p.contextGet(
-		ctx,
+	threadContext, errWithCode := p.contextGet(ctx,
 		requester,
 		targetStatusID,
 	)
@@ -326,7 +307,7 @@ func (p *Processor) ContextGet(
 		threadContext.ancestors,
 		statusfilter.FilterContextThread,
 		filters,
-		mutes,
+		true,
 	)
 
 	// Convert and filter the thread context descendants
@@ -335,7 +316,7 @@ func (p *Processor) ContextGet(
 		threadContext.descendants,
 		statusfilter.FilterContextThread,
 		filters,
-		mutes,
+		true,
 	)
 
 	return &apiContext, nil
@@ -352,8 +333,8 @@ func (p *Processor) WebContextGet(
 	targetStatusID string,
 ) (*apimodel.WebThreadContext, gtserror.WithCode) {
 	// Retrieve the internal thread context.
-	iCtx, errWithCode := p.contextGet(
-		ctx,
+	iCtx, errWithCode := p.contextGet(ctx,
+
 		nil, // No authed requester.
 		targetStatusID,
 	)

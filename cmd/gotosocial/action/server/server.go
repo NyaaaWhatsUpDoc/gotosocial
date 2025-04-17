@@ -43,6 +43,7 @@ import (
 	"github.com/superseriousbusiness/gotosocial/internal/federation"
 	"github.com/superseriousbusiness/gotosocial/internal/federation/federatingdb"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/interaction"
+	"github.com/superseriousbusiness/gotosocial/internal/filter/mutes"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/spam"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/visibility"
 	"github.com/superseriousbusiness/gotosocial/internal/gtserror"
@@ -268,6 +269,7 @@ var Start action.GTSAction = func(ctx context.Context) error {
 	)
 	typeConverter := typeutils.NewConverter(state)
 	visFilter := visibility.NewFilter(state)
+	muteFilter := mutes.NewFilter(state)
 	intFilter := interaction.NewFilter(state)
 	spamFilter := spam.NewFilter(state)
 	federatingDB := federatingdb.New(state, typeConverter, visFilter, intFilter, spamFilter)
@@ -348,6 +350,7 @@ var Start action.GTSAction = func(ctx context.Context) error {
 		emailSender,
 		webPushSender,
 		visFilter,
+		muteFilter,
 		intFilter,
 	)
 

@@ -45,6 +45,7 @@ func New(
 	converter *typeutils.Converter,
 	federator *federation.Federator,
 	visFilter *visibility.Filter,
+	muteFilter *mutes.Filter,
 ) Processor {
 	return Processor{
 		state:     state,

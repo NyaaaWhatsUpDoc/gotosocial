@@ -22,6 +22,7 @@ import (
 	"errors"
 
 	"github.com/superseriousbusiness/gotosocial/internal/db"
+	"github.com/superseriousbusiness/gotosocial/internal/filter/mutes"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/usermute"
 	"github.com/superseriousbusiness/gotosocial/internal/filter/visibility"
 	"github.com/superseriousbusiness/gotosocial/internal/gtscontext"
@@ -32,20 +33,23 @@ import (
 )
 
 type Processor struct {
-	state     *state.State
-	converter *typeutils.Converter
-	filter    *visibility.Filter
+	state      *state.State
+	converter  *typeutils.Converter
+	visFilter  *visibility.Filter
+	muteFilter *mutes.Filter
 }
 
 func New(
 	state *state.State,
 	converter *typeutils.Converter,
-	filter *visibility.Filter,
+	visFilter *visibility.Filter,
+	muteFilter *mutes.Filter,
 ) Processor {
 	return Processor{
-		state:     state,
-		converter: converter,
-		filter:    filter,
+		state:      state,
+		converter:  converter,
+		visFilter:  visFilter,
+		muteFilter: muteFilter,
 	}
 }
 

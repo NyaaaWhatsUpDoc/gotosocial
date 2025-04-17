@@ -632,25 +632,31 @@ func (s *Surface) Notify(
 	// with the state-y stuff.
 	unlock()
 
-	if statusID != "" {
-		// Check whether mutes are disabled for this status by target account.
-		notify, err := s.MuteFilter.NotifyForStatus(ctx, targetAccount, status)
+	// Check whether origin account is muted by target account.
+	muted, err := s.MuteFilter.AccountNotificationsMuted(ctx,
+		targetAccount,
+		originAccount,
+	)
+	if err != nil {
+		return gtserror.Newf("error checking account mute: %w", err)
+	}
+
+	if muted {
+		// Don't notify.
+		return nil
+	}
+
+	if status != nil {
+		// Check whether status is muted by the target account.
+		muted, _, err := s.MuteFilter.StatusNotificationsMuted(ctx,
+			targetAccount,
+			status,
+		)
 		if err != nil {
 			return gtserror.Newf("error checking status mute: %w", err)
 		}
 
-		if !notify {
-			// Don't notify.
-			return nil
-		}
-	} else {
-		// Check whether mutes are disable from this account by the target account.
-		notify, err := s.MuteFilter.NotifyFromAccount(ctx, targetAccount, originAccount)
-		if err != nil {
-			return gtserror.Newf("error checking user mute: %w", err)
-		}
-
-		if !notify {
+		if muted {
 			// Don't notify.
 			return nil
 		}
@@ -666,7 +672,7 @@ func (s *Surface) Notify(
 		return gtserror.Newf("error converting notification to api representation: %w", err)
 	}
 
-	// Filtered notification.
+	// Filtered notif.
 	if apiNotif == nil {
 		return nil
 	}

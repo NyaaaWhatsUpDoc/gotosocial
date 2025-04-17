@@ -98,22 +98,20 @@ func (p *Processor) ListTimelineGet(
 		// Filtering function,
 		// i.e. filter before caching.
 		func(s *gtsmodel.Status) bool {
-			var ok bool
-			var err error
 
 			// Check the visibility of passed status to requesting user.
-			ok, err = p.visFilter.StatusHomeTimelineable(ctx, requester, s)
+			ok, err := p.visFilter.StatusHomeTimelineable(ctx, requester, s)
 			if err != nil {
 				log.Errorf(ctx, "error checking status %s visibility: %v", s.URI, err)
 			} else if !ok {
 				return true
 			}
 
-			// Check whether status has been muted by user from timelines.
-			ok, err = p.muteFilter.StatusTimelineable(ctx, requester, s)
+			// Check if status been muted (with any expiry) by user from timelines.
+			muted, withExpiry, err := p.muteFilter.StatusMuted(ctx, requester, s)
 			if err != nil {
 				log.Errorf(ctx, "error checking status %s mutes: %v", s.URI, err)
-			} else if !ok {
+			} else if muted && !withExpiry {
 				return true
 			}
 
